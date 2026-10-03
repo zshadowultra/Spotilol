@@ -16,7 +16,7 @@ object AndroidTracker {
                     var rr = document.querySelector('button[data-testid=control-button-repeat]');
                     if(rr) repmode=rr.getAttribute('aria-checked'); else repmode='false';
                     shuffle = (typeof window.splShuffleState === 'function') ? window.splShuffleState() : 'off';
-                    var fb = document.querySelector('div[data-testid=now-playing-widget]>div:last-child>button');
+                    var fb = document.querySelector('div[data-testid="now-playing-widget"] button[aria-label="Save to Your Library"], div[data-testid="now-playing-widget"] button[aria-label="Remove from Your Library"]');
                     if(fb && fb.getAttribute('aria-checked')==='true') isfav=true; else isfav=false;
                     playing=window.splIsPlayingSticky();
                     var rg = document.querySelector('div[data-testid=playback-progressbar] input[type=range]');

@@ -210,7 +210,7 @@ object PlaybackControls {
                 }
             };
             window.actAddToFav = function() {
-                var fb = document.querySelector('div[data-testid=now-playing-widget]>div:last-child>button');
+                 var fb = document.querySelector('div[data-testid="now-playing-widget"] button[aria-label="Save to Your Library"], div[data-testid="now-playing-widget"] button[aria-label="Remove from Your Library"]');
                 if(fb) {
                     if(fb.getAttribute('aria-checked')==='false') {
                         fb.click();
@@ -231,6 +231,10 @@ object PlaybackControls {
                                 },500);
                             }
                         },1000);
+                        var rftimeout = setTimeout(function(){
+                            clearInterval(rfint);
+                            AndBridge.wakeOff();
+                        },5000);
                     }
                 }
             };

@@ -421,7 +421,7 @@ object SpotilolPlayer {
                             }
                         }
                         if(lk){
-                            var fb=document.querySelector('div[data-testid=now-playing-widget]>div:last-child>button');
+                            var fb=document.querySelector('div[data-testid="now-playing-widget"] button[aria-label="Save to Your Library"], div[data-testid="now-playing-widget"] button[aria-label="Remove from Your Library"]');
                             var liked=fb&&fb.getAttribute('aria-checked')==='true';
                             lk.classList.toggle('spl-active',liked===true);
                         }
