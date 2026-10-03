@@ -205,16 +205,76 @@ object CustomUI {
                             } catch (e) { console.error('[CustomUI] override failed', e); }
                         }, 100);
 
+                        // Load the user's real playlists into the home grid.
+                        // Replaces the hardcoded demo tiles with data from
+                        // window.fetchAllLibrary() + window.parseLibrary().
+                        // Same CSS classes (recent-card/recent-thumb/recent-title)
+                        // so the approved visual design is untouched.
+                        function loadRealHomeContent() {
+                            try {
+                                if (typeof window.fetchAllLibrary !== 'function') return;
+                                if (typeof window.parseLibrary !== 'function') return;
+                                window.fetchAllLibrary().then(function(items) {
+                                    try {
+                                        var lib = window.parseLibrary(items);
+                                        var grid = document.getElementById('homeGrid');
+                                        if (!grid || !lib || !lib.playlists || !lib.playlists.length) return;
+                                        // Keep the Liked Songs card (first child), replace the rest
+                                        var likedCard = grid.children[0] || null;
+                                        grid.innerHTML = '';
+                                        if (likedCard) grid.appendChild(likedCard);
+                                        lib.playlists.slice(0, 5).forEach(function(pl) {
+                                            var card = document.createElement('div');
+                                            card.className = 'recent-card';
+                                            var uri = pl.id || '';
+                                            var name = pl.name || 'Playlist';
+                                            var img = pl.image || '';
+                                            card.addEventListener('click', (function(u, n, im) {
+                                                return function() {
+                                                    if (typeof window.playPlaylist === 'function') {
+                                                        window.playPlaylist(u, n, im);
+                                                    }
+                                                };
+                                            })(uri, name, img));
+                                            if (img) {
+                                                var thumb = document.createElement('img');
+                                                thumb.className = 'recent-thumb';
+                                                thumb.src = img;
+                                                thumb.alt = name;
+                                                card.appendChild(thumb);
+                                            } else {
+                                                var ph = document.createElement('div');
+                                                ph.className = 'recent-thumb';
+                                                ph.style.background = 'var(--sp-accent-congaso)';
+                                                card.appendChild(ph);
+                                            }
+                                            var span = document.createElement('span');
+                                            span.className = 'recent-title';
+                                            span.innerText = name;
+                                            card.appendChild(span);
+                                            grid.appendChild(card);
+                                        });
+                                        console.log('[CustomUI] home grid populated with ' + Math.min(5, lib.playlists.length) + ' real playlists');
+                                    } catch (e) { console.error('[CustomUI] home populate failed', e); }
+                                }).catch(function(e) {});
+                            } catch (e) {}
+                        }
+                        // Defer: library fetch needs Spotify auth tokens to be ready
+                        setTimeout(loadRealHomeContent, 3000);
+                        setTimeout(loadRealHomeContent, 8000);
+
                         // Live sync: poll real state and update UI
                         var lastTitle = '', lastPlaying = null;
+                        var NOTHING_PLAYING = 'Nothing playing';
                         setInterval(function() {
                             try {
                                 var track = window.__bridge.track;
                                 var playing = window.__bridge.playing;
 
-                                // Update track info if changed
-                                if (track.title && track.title !== lastTitle) {
-                                    lastTitle = track.title;
+                                // Update track info if changed (or if nothing is playing)
+                                var curTitle = (track.title || '').trim();
+                                if (curTitle && curTitle !== lastTitle) {
+                                    lastTitle = curTitle;
                                     var titleEls = ['miniTitle', 'fpTitle'];
                                     var artistEls = ['miniArtist', 'fpArtist'];
                                     titleEls.forEach(function(id) {
@@ -232,6 +292,17 @@ object CustomUI {
                                             if (el) el.src = track.art;
                                         });
                                     }
+                                } else if (!curTitle && lastTitle !== NOTHING_PLAYING) {
+                                    // Nothing playing - show placeholder instead of stale mock
+                                    lastTitle = NOTHING_PLAYING;
+                                    ['miniTitle', 'fpTitle'].forEach(function(id) {
+                                        var el = document.getElementById(id);
+                                        if (el) el.innerText = NOTHING_PLAYING;
+                                    });
+                                    ['miniArtist', 'fpArtist'].forEach(function(id) {
+                                        var el = document.getElementById(id);
+                                        if (el) el.innerText = 'Pick something to listen to';
+                                    });
                                 }
 
                                 // Update play/pause icons if changed

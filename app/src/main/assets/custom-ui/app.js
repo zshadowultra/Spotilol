@@ -5,9 +5,9 @@
     let isPlaying = typeof __b.playing === 'boolean' ? __b.playing : true;
     let isLiked = typeof __b.liked === 'boolean' ? __b.liked : true;
     let activeTrack = {
-      title: __bt.title || 'CONGASO - Totally Slowed',
-      artist: __bt.artist || 'ASTXR, Bumishen\'ka',
-      thumb: __bt.art || 'art/1509198397868-475647b2a1e5.jpg',
+      title: __bt.title || 'Nothing playing',
+      artist: __bt.artist || 'Pick something to listen to',
+      thumb: __bt.art || 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7',
       colorToken: 'sp-accent-congaso'
     };
 
@@ -158,7 +158,11 @@
     }
 
     // Play track with dynamic album accent background
-    function playSong(title, artist, thumb, accentColor) {
+    function playSong(title, artist, thumb, accentColor, uri) {
+      // If a Spotify URI is provided, play it for real via the bridge seams.
+      if (uri && typeof window.playFromUri === 'function') {
+        try { window.playFromUri(uri); } catch (e) {}
+      }
       activeTrack.title = title;
       activeTrack.artist = artist;
       activeTrack.thumb = thumb;
@@ -183,6 +187,36 @@
       document.getElementById('fpPlayIcon').innerHTML = pauseSvg;
       document.getElementById('headerPlayIcon').innerHTML = pauseSvg;
       openFullPlayer();
+    }
+
+    // Play a real Spotify playlist/album/artist by URI. Used by the
+    // dynamically-populated home grid (see CustomUI.kt loadRealHomeContent).
+    function playPlaylist(uri, name, image) {
+      if (uri && typeof window.playFromUri === 'function') {
+        try { window.playFromUri(uri); } catch (e) {}
+      }
+      // Optimistic UI update; the live sync loop corrects it when the
+      // real track metadata arrives.
+      var title = name || 'Playing...';
+      activeTrack.title = title;
+      activeTrack.artist = '';
+      activeTrack.thumb = image || activeTrack.thumb;
+      activeTrack.colorToken = 'sp-accent-congaso';
+      try {
+        document.getElementById('miniTitle').innerText = title;
+        document.getElementById('miniArtist').innerText = '';
+        if (image) document.getElementById('miniThumb').src = image;
+        document.getElementById('fpTitle').innerText = title;
+        document.getElementById('fpArtist').innerText = '';
+        if (image) document.getElementById('fpArtwork').src = image;
+      } catch (e) {}
+      isPlaying = true;
+      try {
+        const pauseSvg = '<path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/>';
+        document.getElementById('miniPlayIcon').innerHTML = pauseSvg;
+        document.getElementById('fpPlayIcon').innerHTML = pauseSvg;
+        document.getElementById('headerPlayIcon').innerHTML = pauseSvg;
+      } catch (e) {}
     }
 
     function skipTrack(dir) {
