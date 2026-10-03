@@ -41,9 +41,9 @@ class OfflineActivity : ComponentActivity() {
 
         prefs = getSharedPreferences("spotilol_prefs", MODE_PRIVATE)
 
-        materialYouState.value = prefs.getBoolean("MaterialYou", false)
-        amoledState.value = prefs.getBoolean("AmoledTheme", false)
-        hideTopBarState.value = prefs.getBoolean("HideTopBar", false)
+        materialYouState.value = prefs.getBoolean("MaterialYou", true)
+        amoledState.value = prefs.getBoolean("AmoledTheme", true)
+        hideTopBarState.value = prefs.getBoolean("HideTopBar", true)
         landscapeState.value = prefs.getBoolean("LandscapeMode", false)
         keepScreenOnState.value = prefs.getBoolean("KeepScreenOn", false)
         paletteSeedState.value = prefs.getString("PaletteSeed", null)

@@ -223,9 +223,9 @@ class MainActivity : ComponentActivity() {
         val loggedIn = prefs.getBoolean("LoggedIn", false)
 
         serviceEnabledState.value = prefs.getBoolean("ServiceOn", true)
-        materialYouState.value = prefs.getBoolean("MaterialYou", false)
-        amoledState.value = prefs.getBoolean("AmoledTheme", false)
-        hideTopBarState.value = prefs.getBoolean("HideTopBar", false)
+        materialYouState.value = prefs.getBoolean("MaterialYou", true)
+        amoledState.value = prefs.getBoolean("AmoledTheme", true)
+        hideTopBarState.value = prefs.getBoolean("HideTopBar", true)
         landscapeModeState.value = prefs.getBoolean("LandscapeMode", false)
         keepScreenOnState.value = prefs.getBoolean("KeepScreenOn", false)
         paletteSeedState.value = prefs.getString("PaletteSeed", null)
@@ -1390,9 +1390,9 @@ class MainActivity : ComponentActivity() {
 
         prefs = getSharedPreferences("spotilol_prefs", MODE_PRIVATE)
         serviceEnabledState.value = prefs.getBoolean("ServiceOn", true)
-        materialYouState.value = prefs.getBoolean("MaterialYou", false)
-        amoledState.value = prefs.getBoolean("AmoledTheme", false)
-        hideTopBarState.value = prefs.getBoolean("HideTopBar", false)
+        materialYouState.value = prefs.getBoolean("MaterialYou", true)
+        amoledState.value = prefs.getBoolean("AmoledTheme", true)
+        hideTopBarState.value = prefs.getBoolean("HideTopBar", true)
         landscapeModeState.value = prefs.getBoolean("LandscapeMode", false)
         keepScreenOnState.value = prefs.getBoolean("KeepScreenOn", false)
         paletteSeedState.value = prefs.getString("PaletteSeed", null)
@@ -1401,7 +1401,7 @@ class MainActivity : ComponentActivity() {
         applyKeepScreenOn()
 
         val customCss = prefs.getString("CustomCss", "") ?: ""
-        val amoledEnabled = prefs.getBoolean("AmoledTheme", false)
+        val amoledEnabled = prefs.getBoolean("AmoledTheme", true)
 
         webView?.let { view ->
             view.evaluateJavascript("""

@@ -70,8 +70,8 @@ class CrashActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
 
         val prefs = getSharedPreferences("spotilol_prefs", MODE_PRIVATE)
-        val amoled = prefs.getBoolean("AmoledTheme", false)
-        val materialYou = prefs.getBoolean("MaterialYou", false)
+        val amoled = prefs.getBoolean("AmoledTheme", true)
+        val materialYou = prefs.getBoolean("MaterialYou", true)
         val seed = parseSeed(prefs.getString("PaletteSeed", null))
         val summary = intent?.getStringExtra(CrashHandler.extraSummary())
             ?: CrashStore.summary(this)

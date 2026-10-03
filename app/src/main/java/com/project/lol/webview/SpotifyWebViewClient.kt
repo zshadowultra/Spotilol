@@ -311,7 +311,7 @@ class SpotifyWebViewClient(
         val prefs = view.context.getSharedPreferences("spotilol_prefs", 0)
         val autoPlayMode = prefs.getString("APlayMode", "disabled") ?: "disabled"
         val closeNowPlay = prefs.getBoolean("CloseNowPlay", true)
-        val amoledEnabled = prefs.getBoolean("AmoledTheme", false)
+        val amoledEnabled = prefs.getBoolean("AmoledTheme", true)
         val customCss = prefs.getString("CustomCss", "") ?: ""
         val playerMode = prefs.getString("PlayerMode", "spotilol") ?: "spotilol"
         val useProxy = prefs.getString("ConnectionMode", "normal") == "proxy"
@@ -425,7 +425,7 @@ class SpotifyWebViewClient(
                     wv.evaluateJavascript("window.autoPlayMode='$mode';", null)
                 }
                 "AmoledTheme", "CustomCss", "LyricsStyle" -> {
-                    val js = buildAmoledJs(prefs.getBoolean("AmoledTheme", false)) + ";\n" +
+                    val js = buildAmoledJs(prefs.getBoolean("AmoledTheme", true)) + ";\n" +
                             buildCustomCssJs(prefs.getString("CustomCss", "") ?: "")
                     wv.evaluateJavascript(js, null)
                     wv.evaluateJavascript(LyricsTheme.buildLyricsStyleJs(prefs.getString("LyricsStyle", LyricsTheme.DEFAULT_STYLE) ?: LyricsTheme.DEFAULT_STYLE), null)
