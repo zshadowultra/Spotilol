@@ -107,7 +107,12 @@ object SettingsFix {
 
             interceptAll();
 
-            var obs = new MutationObserver(function() { interceptAll(); });
+            var obs = new MutationObserver(function(muts){
+                var dirty = false;
+                for (var i = 0; i < muts.length && !dirty; i++)
+                    if (muts[i].addedNodes.length) dirty = true;
+                if (dirty) interceptAll();
+            });
             obs.observe(document.documentElement, {
                 childList: true, subtree: true
             });

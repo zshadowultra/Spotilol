@@ -355,23 +355,30 @@ object SpotilolPlayer {
                 pl.addEventListener('mousedown',function(e){if(e.button!==0)return;if(e.target.closest('#spl-bar')||e.target.closest('#spl-edgebar')||e.target.closest('.spl-vol-bar')||e.target.closest('button'))return;splDragStart(e.clientX,e.clientY);});
                 document.addEventListener('mousemove',function(e){splDragMove(e.clientX,e.clientY);});
                 document.addEventListener('mouseup',function(){splDragEnd();});
-                pl.addEventListener('click',function(e){if(splSuppressClick)return;if(Date.now()-splLastDragEnd<400)return;if(splMini&&!e.target.closest('button')&&!e.target.closest('#spl-bar')&&!e.target.closest('#spl-edgebar'))splSetMini(false);});                    window.splUpdate=function(){
-                        var ci=document.getElementById('spl-cover-img');
-                        var tk=document.getElementById('spl-track');
-                        var ar=document.getElementById('spl-artist');
-                        var fl=document.getElementById('spl-fill');
-                        var fe=document.getElementById('spl-fill-edge');
-                        var hd=document.getElementById('spl-handle');
-                        var ps=document.getElementById('spl-pos');
-                        var ds=document.getElementById('spl-dur');
-                        var pp=document.getElementById('spl-play');
-                        var ppm=document.getElementById('spl-play-mini');
-                        var sh=document.getElementById('spl-shuffle');
-                        var rp=document.getElementById('spl-repeat');
-                        var vl=document.getElementById('spl-vol');
-                        var lk=document.getElementById('spl-liked');
-                        var ly=document.getElementById('spl-lyrics');
-                        var tm=document.getElementById('spl-timer');
+                pl.addEventListener('click',function(e){if(splSuppressClick)return;if(Date.now()-splLastDragEnd<400)return;if(splMini&&!e.target.closest('button')&&!e.target.closest('#spl-bar')&&!e.target.closest('#spl-edgebar'))splSetMini(false);});                    // Cached getElementById with isConnected validation (re-resolves if DOM rebuilt)
+                    var __splElCache={};
+                    function splEl(id){
+                        var el=__splElCache[id];
+                        if(!el||!el.isConnected){ el=document.getElementById(id); __splElCache[id]=el; }
+                        return el;
+                    }
+                    window.splUpdate=function(){
+                        var ci=splEl('spl-cover-img');
+                        var tk=splEl('spl-track');
+                        var ar=splEl('spl-artist');
+                        var fl=splEl('spl-fill');
+                        var fe=splEl('spl-fill-edge');
+                        var hd=splEl('spl-handle');
+                        var ps=splEl('spl-pos');
+                        var ds=splEl('spl-dur');
+                        var pp=splEl('spl-play');
+                        var ppm=splEl('spl-play-mini');
+                        var sh=splEl('spl-shuffle');
+                        var rp=splEl('spl-repeat');
+                        var vl=splEl('spl-vol');
+                        var lk=splEl('spl-liked');
+                        var ly=splEl('spl-lyrics');
+                        var tm=splEl('spl-timer');
 
                         var npb=document.querySelector('[data-testid="now-playing-widget"]');
                         var imgEl=npb?npb.querySelector('img[data-testid="cover-art-image"]'):null;
@@ -390,8 +397,8 @@ object SpotilolPlayer {
                             var ph=isPlaying
                                 ?'<svg viewBox="0 0 16 16"><path fill="currentColor" d="M2.7 1a.7.7 0 0 0-.7.7v12.6a.7.7 0 0 0 .7.7h2.6a.7.7 0 0 0 .7-.7V1.7a.7.7 0 0 0-.7-.7zm8 0a.7.7 0 0 0-.7.7v12.6a.7.7 0 0 0 .7.7h2.6a.7.7 0 0 0 .7-.7V1.7a.7.7 0 0 0-.7-.7z"/></svg>'
                                 :'<svg viewBox="0 0 16 16"><path fill="currentColor" d="M3 1.713a.7.7 0 0 1 1.05-.607l10.89 6.288a.7.7 0 0 1 0 1.212L4.05 14.894A.7.7 0 0 1 3 14.288z"/></svg>';
-                            if(pp)pp.innerHTML=ph;
-                            if(ppm)ppm.innerHTML=ph;
+                            if(pp && pp.__splPh !== ph){ pp.innerHTML = ph; pp.__splPh = ph; }
+                            if(ppm && ppm.__splPh !== ph){ ppm.innerHTML = ph; ppm.__splPh = ph; }
                         }
                         if(sh){
                             var sst=splShuffleState();
@@ -426,9 +433,9 @@ object SpotilolPlayer {
                             lk.classList.toggle('spl-active',liked===true);
                         }
                         if(vl){
-                            var vbb=document.getElementById('spl-vol-btn');
-                            var vf=document.getElementById('spl-vol-fill');
-                            var vh=document.getElementById('spl-vol-handle');
+                            var vbb=splEl('spl-vol-btn');
+                            var vf=splEl('spl-vol-fill');
+                            var vh=splEl('spl-vol-handle');
                             var vrb=document.querySelector('button[data-testid=volume-bar-toggle-mute-button]');
                             var vrg=document.querySelector('div[data-testid="volume-bar"] input[type="range"]')||document.querySelector('input[type="range"][data-testid="volume-bar"]');
                             var vpct=0;
@@ -453,7 +460,7 @@ object SpotilolPlayer {
                             ly.style.display='none';
                         }
                         if(tm) tm.classList.toggle('spl-active',typeof sleepTimerActive!=='undefined'&&sleepTimerActive&&sleepTimerActive.value);
-                        var dcb=document.getElementById('spl-dl-cancel');
+                        var dcb=splEl('spl-dl-cancel');
                         if(dcb) dcb.style.display = window.__splDlActive ? '' : 'none';
 
                         var pbEl=document.querySelector('[data-testid="playback-progressbar"] [data-testid="progress-bar"]');
@@ -480,7 +487,10 @@ object SpotilolPlayer {
 
                     var rafLastTime=0;
                     function rafUpdate(timestamp){
-                        if(timestamp-rafLastTime>100){ splUpdate(); rafLastTime=timestamp; }
+                        if(timestamp-rafLastTime>500){
+                            if(document.visibilityState!=='hidden'&&!window.__splBg) splUpdate();
+                            rafLastTime=timestamp;
+                        }
                         requestAnimationFrame(rafUpdate);
                     }
                     if(window.splMiniPref) splSetMini(true);

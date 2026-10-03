@@ -546,7 +546,44 @@ object PlaylistSort {
             observeMenu();
             injectStyle();
             decorate();
-            setInterval(decorate, 1000);
+            // Event-driven decorate (replaces 1s setInterval): observe for columnheader
+            // changes, keep 5s fallback warden for anything the observer misses.
+            // injectStyle() already early-returns if the style element exists.
+            var headerObserver = null;
+            var headerDebounce = null;
+            function scheduleDecorate(){
+                if (headerDebounce) return;
+                headerDebounce = setTimeout(function(){ headerDebounce = null; decorate(); }, 100);
+            }
+            try {
+                if (window.MutationObserver) {
+                    var hroot = document.body || document.documentElement;
+                    headerObserver = new MutationObserver(function(muts){
+                        for (var i = 0; i < muts.length; i++){
+                            var m = muts[i];
+                            if (m.type === 'childList') {
+                                var nodes = m.addedNodes;
+                                for (var j = 0; j < nodes.length; j++){
+                                    var n = nodes[j];
+                                    if (!n || n.nodeType !== 1) continue;
+                                    if ((n.getAttribute && n.getAttribute('role') === 'columnheader') ||
+                                        (n.querySelector && n.querySelector('[role="columnheader"]'))) {
+                                        scheduleDecorate();
+                                        return;
+                                    }
+                                }
+                            } else if (m.type === 'attributes' && m.target.getAttribute &&
+                                m.target.getAttribute('role') === 'columnheader') {
+                                scheduleDecorate();
+                                return;
+                            }
+                        }
+                    });
+                    headerObserver.observe(hroot, { childList: true, subtree: true, attributes: true,
+                        attributeFilter: ['role', 'aria-sort', 'data-spl-sort'] });
+                }
+            } catch(e){}
+            setInterval(function(){ if (!window.__splBg) decorate(); }, 5000);
             // apply once the player has mounted so a saved choice survives reloads and
             // also covers playlists served straight from the query cache
             if (state) {

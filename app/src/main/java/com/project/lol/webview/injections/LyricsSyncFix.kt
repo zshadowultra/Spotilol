@@ -13,7 +13,7 @@ object LyricsSyncFix {
 
             var GAP = 10;
 
-            var SWEEP_MS = 800;
+            var SWEEP_MS = 2000;
             var OBS_DEBOUNCE_MS = 120;
 
             var tracked = [];
@@ -38,6 +38,9 @@ object LyricsSyncFix {
                 if (!b || !b.isConnected) return false;
                 var r = b.getBoundingClientRect();
                 if (r.height < 2 || r.width < 2) return false;
+                // Cheap pre-filter before expensive getComputedStyle walk:
+                // offsetParent is null for display:none (or position:fixed, which dress() sets)
+                if (b.offsetParent === null && !b.__splFloated) return false;
                 var cs = getComputedStyle(b);
                 if (cs.display === 'none' || cs.visibility === 'hidden') return false;
                 if (parseFloat(cs.opacity) < 0.02) return false;
@@ -125,6 +128,12 @@ object LyricsSyncFix {
             }
 
             function rebalance(){
+                // Early-return: no lyrics view open (no buttonPrimary candidates at all)
+                // — single cheap querySelector instead of full pickCandidate() scan
+                if (!document.querySelector('button[data-encore-id="buttonPrimary"]')){
+                    for (var i = tracked.length - 1; i >= 0; i--) release(tracked[i]);
+                    return;
+                }
                 for (var i = tracked.length - 1; i >= 0; i--){
                     if (!tracked[i].isConnected) untrack(tracked[i]);
                 }
@@ -171,6 +180,8 @@ object LyricsSyncFix {
                     }
                 }
                 if (dirty && !obsPending){
+                    // Early-return: nothing tracked and no candidates → rebalance would be a no-op
+                    if (!tracked.length && !document.querySelector('button[data-encore-id="buttonPrimary"]')) return;
                     obsPending = true;
                     setTimeout(function(){
                         obsPending = false;
