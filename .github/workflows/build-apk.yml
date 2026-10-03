@@ -23,16 +23,6 @@ jobs:
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
-      - name: Decode google-services.json
-        env:
-          GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
-        run: |
-          if [ -z "$GOOGLE_SERVICES_JSON" ]; then
-            echo "GOOGLE_SERVICES_JSON secret not set"
-            exit 1
-          fi
-          echo "$GOOGLE_SERVICES_JSON" | base64 -d > app/google-services.json
-
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
 
