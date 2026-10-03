@@ -38,6 +38,29 @@
     }
     window.__splLogTap = __splLogTap;
 
+    // ---- resilient tap binding ----
+    // Some Android WebViews / host pages suppress click synthesis (e.g. a
+    // third-party touchstart preventDefault kills the click). Bind touchend
+    // AND click with dedup so a tap registers via whichever path survives.
+    function bindTap(el, fn) {
+      if (!el || el.__splTapBound) return;
+      el.__splTapBound = true;
+      var lastTouch = 0;
+      el.addEventListener('touchend', function(e) {
+        lastTouch = Date.now();
+        try { fn.call(el, e); } catch (err) {
+          window.__splLastError = String((err && err.message) || err);
+        }
+      }, { passive: true });
+      el.addEventListener('click', function(e) {
+        if (Date.now() - lastTouch < 700) return; // touchend already handled it
+        try { fn.call(el, e); } catch (err) {
+          window.__splLastError = String((err && err.message) || err);
+        }
+      });
+    }
+    window.bindTap = bindTap;
+
     function openSheet(id) {
       document.getElementById('modalBackdrop').classList.add('open');
       document.getElementById(id).classList.add('open');
@@ -287,7 +310,7 @@
         sub.appendChild(subSpan);
         info.appendChild(sub);
         row.appendChild(info);
-        row.addEventListener('click', function() {
+        window.bindTap(row, function() {
           if (typeof window.playFromUri === 'function') {
             try { window.playFromUri(t.uri, contextUri); } catch (e) {}
           }
@@ -485,4 +508,21 @@
         var iv = setInterval(function() { if (attach()) clearInterval(iv); }, 500);
         setTimeout(function() { clearInterval(iv); }, 10000);
       }
+    })();
+
+    // ---- rebind nav tabs through bindTap ----
+    // Replaces inline onclick with touchend+click listeners so tab switches
+    // survive WebViews that suppress click synthesis.
+    (function rebindNavTabs() {
+      try {
+        var tabs = document.querySelectorAll('.nav-tab');
+        tabs.forEach(function(btn) {
+          var m = (btn.getAttribute('onclick') || '').match(/switchTab\('(\w+)'/);
+          if (!m) return;
+          var tabName = m[1];
+          btn.onclick = null;
+          btn.removeAttribute('onclick');
+          window.bindTap(btn, function() { window.switchTab(tabName, btn); });
+        });
+      } catch (e) {}
     })();

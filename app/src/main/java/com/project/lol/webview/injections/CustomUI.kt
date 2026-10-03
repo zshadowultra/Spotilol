@@ -244,7 +244,8 @@ object CustomUI {
                                                 var uri = pid;
                                                 var name = pname || 'Playlist';
                                                 var img = pl.image || '';
-                                                card.addEventListener('click', (function(u, n, im) {
+                                                var __bind = (typeof window.bindTap === 'function') ? window.bindTap : function(el, fn) { el.addEventListener('click', fn); };
+                                                __bind(card, (function(u, n, im) {
                                                     return function() {
                                                         try {
                                                             if (typeof window.__splLogTap === 'function') {
@@ -334,7 +335,8 @@ object CustomUI {
                                         var sub = subOf ? (it[subOf] || []).join(', ') : '';
                                         var card = document.createElement('div');
                                         card.className = 'release-card';
-                                        card.addEventListener('click', (function(u, n, im) {
+                                        var __bind2 = (typeof window.bindTap === 'function') ? window.bindTap : function(el, fn) { el.addEventListener('click', fn); };
+                                        __bind2(card, (function(u, n, im) {
                                             return function() {
                                                 try {
                                                     if (typeof window.__splLogTap === 'function') {
