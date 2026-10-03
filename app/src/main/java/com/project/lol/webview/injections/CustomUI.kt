@@ -205,11 +205,15 @@ object CustomUI {
                             } catch (e) { console.error('[CustomUI] override failed', e); }
                         }, 100);
 
-                        // Load the user's real playlists into the home grid.
-                        // Replaces the hardcoded demo tiles with data from
-                        // window.fetchAllLibrary() + window.parseLibrary().
-                        // Same CSS classes (recent-card/recent-thumb/recent-title)
-                        // so the approved visual design is untouched.
+                        // Load the user's real library content into the home view.
+                        // - Grid: keeps the Liked Songs card, adds up to 6 real
+                        //   playlists (deduped: the API also returns the Liked
+                        //   Songs collection). Taps open the playlist detail.
+                        // - Sections: replaces the fake "Pre-save upcoming
+                        //   releases" block with real "Your Albums" and
+                        //   "Your Artists" sections from the parsed library.
+                        // Same CSS classes everywhere, so the approved visual
+                        // design is untouched.
                         function loadRealHomeContent() {
                             try {
                                 if (typeof window.fetchAllLibrary !== 'function') return;
@@ -217,47 +221,172 @@ object CustomUI {
                                 window.fetchAllLibrary().then(function(items) {
                                     try {
                                         var lib = window.parseLibrary(items);
+                                        if (!lib) return;
+
+                                        // ---- Home grid ----
                                         var grid = document.getElementById('homeGrid');
-                                        if (!grid || !lib || !lib.playlists || !lib.playlists.length) return;
-                                        // Keep the Liked Songs card (first child), replace the rest
-                                        var likedCard = grid.children[0] || null;
-                                        grid.innerHTML = '';
-                                        if (likedCard) grid.appendChild(likedCard);
-                                        lib.playlists.slice(0, 5).forEach(function(pl) {
-                                            var card = document.createElement('div');
-                                            card.className = 'recent-card';
-                                            var uri = pl.id || '';
-                                            var name = pl.name || 'Playlist';
-                                            var img = pl.image || '';
-                                            card.addEventListener('click', (function(u, n, im) {
-                                                return function() {
-                                                    if (typeof window.playPlaylist === 'function') {
-                                                        window.playPlaylist(u, n, im);
-                                                    }
-                                                };
-                                            })(uri, name, img));
-                                            if (img) {
-                                                var thumb = document.createElement('img');
-                                                thumb.className = 'recent-thumb';
-                                                thumb.src = img;
-                                                thumb.alt = name;
-                                                card.appendChild(thumb);
-                                            } else {
-                                                var ph = document.createElement('div');
-                                                ph.className = 'recent-thumb';
-                                                ph.style.background = 'var(--sp-accent-congaso)';
-                                                card.appendChild(ph);
+                                        if (grid && lib.playlists && lib.playlists.length) {
+                                            // Keep the Liked Songs card (first child), replace the rest
+                                            var likedCard = grid.children[0] || null;
+                                            grid.innerHTML = '';
+                                            if (likedCard) grid.appendChild(likedCard);
+                                            var seen = 0;
+                                            for (var i = 0; i < lib.playlists.length && seen < 6; i++) {
+                                                var pl = lib.playlists[i];
+                                                var pid = pl.id || '';
+                                                var pname = pl.name || '';
+                                                // Dedupe: skip the Liked Songs collection the API also returns
+                                                if (pid.indexOf('collection') !== -1) continue;
+                                                if (/liked songs/i.test(pname)) continue;
+                                                seen++;
+                                                var card = document.createElement('div');
+                                                card.className = 'recent-card';
+                                                var uri = pid;
+                                                var name = pname || 'Playlist';
+                                                var img = pl.image || '';
+                                                card.addEventListener('click', (function(u, n, im) {
+                                                    return function() {
+                                                        try {
+                                                            if (typeof window.__splLogTap === 'function') {
+                                                                window.__splLogTap('playlist-card:' + n);
+                                                            }
+                                                        } catch (x) {}
+                                                        if (typeof window.openPlaylistDetail === 'function') {
+                                                            window.openPlaylistDetail(u, n, im);
+                                                        } else if (typeof window.playPlaylist === 'function') {
+                                                            // Fallback for older injected JS
+                                                            window.playPlaylist(u, n, im);
+                                                        }
+                                                    };
+                                                })(uri, name, img));
+                                                if (img) {
+                                                    var thumb = document.createElement('img');
+                                                    thumb.className = 'recent-thumb';
+                                                    thumb.src = img;
+                                                    thumb.alt = name;
+                                                    card.appendChild(thumb);
+                                                } else {
+                                                    var ph = document.createElement('div');
+                                                    ph.className = 'recent-thumb';
+                                                    ph.style.background = 'var(--sp-accent-congaso)';
+                                                    card.appendChild(ph);
+                                                }
+                                                var span = document.createElement('span');
+                                                span.className = 'recent-title';
+                                                span.innerText = name;
+                                                card.appendChild(span);
+                                                grid.appendChild(card);
                                             }
-                                            var span = document.createElement('span');
-                                            span.className = 'recent-title';
-                                            span.innerText = name;
-                                            card.appendChild(span);
-                                            grid.appendChild(card);
-                                        });
-                                        console.log('[CustomUI] home grid populated with ' + Math.min(5, lib.playlists.length) + ' real playlists');
+                                            console.log('[CustomUI] home grid populated with ' + seen + ' real playlists');
+                                        }
+
+                                        // ---- Real sections (replaces fakes) ----
+                                        replaceFakeSections(lib);
                                     } catch (e) { console.error('[CustomUI] home populate failed', e); }
                                 }).catch(function(e) {});
                             } catch (e) {}
+                        }
+                        // Removes the fake "Pre-save upcoming releases" block
+                        // and builds "Your Albums" / "Your Artists" from the
+                        // real library. Idempotent: previously built sections
+                        // are tagged and removed before rebuilding (the loader
+                        // fires twice as a fallback).
+                        function replaceFakeSections(lib) {
+                            try {
+                                var homeView = document.querySelector('#tabHome .home-view');
+                                if (!homeView) return;
+
+                                // Remove sections built by a previous run
+                                var old = homeView.querySelectorAll('[data-spl-real-section]');
+                                for (var r = 0; r < old.length; r++) {
+                                    if (old[r].parentNode) old[r].parentNode.removeChild(old[r]);
+                                }
+
+                                // Find and remove the fake block
+                                var anchor = null;
+                                var titles = homeView.querySelectorAll('.section-title');
+                                for (var t = 0; t < titles.length; t++) {
+                                    if (/pre-save/i.test(titles[t].textContent || '')) {
+                                        anchor = titles[t];
+                                        var sib = anchor.nextElementSibling;
+                                        if (sib && sib.classList && sib.classList.contains('release-scroll')) {
+                                            if (sib.parentNode) sib.parentNode.removeChild(sib);
+                                        }
+                                        if (anchor.parentNode) anchor.parentNode.removeChild(anchor);
+                                        anchor = null;
+                                        break;
+                                    }
+                                }
+
+                                function buildSection(heading, items, subOf) {
+                                    if (!items || !items.length) return; // never show fakes
+                                    var h = document.createElement('h2');
+                                    h.className = 'section-title';
+                                    h.setAttribute('data-spl-real-section', '1');
+                                    h.innerText = heading;
+                                    var scroll = document.createElement('div');
+                                    scroll.className = 'release-scroll';
+                                    scroll.setAttribute('data-spl-real-section', '1');
+                                    items.slice(0, 10).forEach(function(it) {
+                                        var uri = it.id || '';
+                                        var name = it.name || heading;
+                                        var img = it.image || '';
+                                        var sub = subOf ? (it[subOf] || []).join(', ') : '';
+                                        var card = document.createElement('div');
+                                        card.className = 'release-card';
+                                        card.addEventListener('click', (function(u, n, im) {
+                                            return function() {
+                                                try {
+                                                    if (typeof window.__splLogTap === 'function') {
+                                                        window.__splLogTap('release-card:' + n);
+                                                    }
+                                                } catch (x) {}
+                                                if (typeof window.playPlaylist === 'function') {
+                                                    window.playPlaylist(u, n, im);
+                                                }
+                                                try {
+                                                    if (typeof window.showToast === 'function') {
+                                                        window.showToast(n);
+                                                    }
+                                                } catch (y) {}
+                                            };
+                                        })(uri, name, img));
+                                        if (img) {
+                                            var cover = document.createElement('img');
+                                            cover.className = 'release-cover';
+                                            cover.src = img;
+                                            cover.alt = name;
+                                            card.appendChild(cover);
+                                        } else {
+                                            var phc = document.createElement('div');
+                                            phc.className = 'release-cover';
+                                            phc.style.background = 'var(--sp-accent-congaso)';
+                                            card.appendChild(phc);
+                                        }
+                                        var nm = document.createElement('div');
+                                        nm.className = 'release-name';
+                                        nm.innerText = name;
+                                        card.appendChild(nm);
+                                        var ar = document.createElement('div');
+                                        ar.className = 'release-artist';
+                                        ar.innerText = sub;
+                                        card.appendChild(ar);
+                                        scroll.appendChild(card);
+                                    });
+                                    // Insert where the fake block was, else append
+                                    if (anchor && anchor.parentNode) {
+                                        anchor.parentNode.insertBefore(h, anchor);
+                                        anchor.parentNode.insertBefore(scroll, anchor);
+                                    } else {
+                                        homeView.appendChild(h);
+                                        homeView.appendChild(scroll);
+                                    }
+                                }
+
+                                buildSection('Your Albums', lib.albums, 'artists');
+                                buildSection('Your Artists', lib.artists, null);
+                                console.log('[CustomUI] real sections built');
+                            } catch (e) { console.error('[CustomUI] sections failed', e); }
                         }
                         // Defer: library fetch needs Spotify auth tokens to be ready
                         setTimeout(loadRealHomeContent, 3000);
