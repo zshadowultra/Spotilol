@@ -75,7 +75,15 @@ class SpotifyWebViewClient(
             return
         }
 
-        if (!loggedIn) {
+        // Test builds: force the custom UI even without login, so tap
+        // mechanics can be tested on a fresh device. Data calls will fail
+        // (no auth) but UI interaction is fully testable.
+        val forceTestUi = try {
+            view.context.assets.open("test-force-ui.json").close()
+            true
+        } catch (e: Exception) { false }
+
+        if (!loggedIn && !forceTestUi) {
             Logger.i(TAG, "not logged in, arming login detection")
             onPageFinishedClean(view, LoginDetection.CONTENT)
             return
