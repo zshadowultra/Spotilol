@@ -80,6 +80,9 @@ class SpotifyWebViewClient(
         // (no auth) but UI interaction is fully testable.
         val forceTestUi = try {
             view.context.assets.open("test-force-ui.json").close()
+            // Ensure CustomUI mode is active for the test
+            view.context.getSharedPreferences("spotilol_prefs", 0)
+                .edit().putString("PlayerMode", "customui").apply()
             true
         } catch (e: Exception) { false }
 
