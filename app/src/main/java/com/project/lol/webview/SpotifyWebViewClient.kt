@@ -63,8 +63,17 @@ class SpotifyWebViewClient(
             onPageFinishedClean(view, ClassicLoginButton.CONTENT)
         }
 
-        val loggedIn = view.context.getSharedPreferences("spotilol_prefs", 0)
+        var loggedIn = view.context.getSharedPreferences("spotilol_prefs", 0)
             .getBoolean("LoggedIn", false)
+
+        // Test builds: seed a baked-in Spotify session so automated device
+        // tests (Appetize/Firebase) don't need interactive login.
+        if (!loggedIn && TestAuth.trySeedTestSession(view.context)) {
+            Logger.i(TAG, "test session seeded, reloading into authenticated state")
+            loggedIn = true
+            view.reload()
+            return
+        }
 
         if (!loggedIn) {
             Logger.i(TAG, "not logged in, arming login detection")
