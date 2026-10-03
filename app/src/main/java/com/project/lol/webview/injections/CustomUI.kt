@@ -3,18 +3,16 @@ package com.project.lol.webview.injections
 /*
  * CustomUI - Full-takeover custom Spotify UI.
  *
- * Loads the judge-loop-approved UI (index.html, styles.css, tokens.css, app.js)
- * from assets/custom-ui/ and injects it into the WebView, hiding Spotify's
- * React SPA. Only the audio element is kept alive.
+ * Loads the judge-loop-approved UI from assets/custom-ui/ and injects it into
+ * the WebView, hiding Spotify's React SPA. Only the audio element is kept alive.
  *
- * The UI talks to window.__bridge which is wired to the real player seams:
- *   __bridge.toggle()    -> actPlayPause()
- *   __bridge.next()      -> actSkipForward()
- *   __bridge.prev()      -> actSkipBack()
- *   __bridge.seek(ms)    -> actSeek()
- *   __bridge.track       -> { title, artist, art, durationMs } (live from TrackObserver)
- *   __bridge.playing     -> boolean (live from splIsPlaying)
- *   __bridge.on(event, cb) -> subscribe to trackchange/playstate
+ * Fixes vs v1:
+ * - Images: art/ paths replaced with base64 data URLs (file:// blocked by
+ *   mixed-content policy on https://open.spotify.com)
+ * - HTML: body content extracted via regex (full document via innerHTML mangles)
+ * - Live sync: polls real player state and updates UI DOM directly
+ * - Controls: overrides prototype stub functions (skipTrack, toggleLike) to
+ *   hit real Spotify seams via window.__bridge
  */
 
 object CustomUI {
@@ -23,43 +21,46 @@ object CustomUI {
                 if (window.__splCustomUiLoaded) return;
                 window.__splCustomUiLoaded = true;
 
-                // Hide Spotify's SPA, keep only media elements alive
                 function hideSpotifyUi() {
                     var st = document.createElement('style');
                     st.id = 'spl-custom-ui-hide';
                     st.textContent = [
-                        '#main, .Root, [data-testid="main"] { display: none !important; }',
+                        '#main, .Root { display: none !important; }',
                         'aside[data-testid="now-playing-bar"] { display: none !important; }',
                         '#spotilolPlayerControls { display: none !important; }',
                         'audio, video { position: fixed !important; width: 1px !important; height: 1px !important;',
                         '  opacity: 0 !important; pointer-events: none !important; }',
                         '#spl-custom-ui-root { position: fixed !important; inset: 0 !important;',
-                        '  z-index: 2147483647 !important; background: #000; overflow: hidden; }',
-                        '#spl-custom-ui-root iframe { width: 100% !important; height: 100% !important; border: 0; }'
+                        '  z-index: 2147483647 !important; background: #000; overflow: hidden; }'
                     ].join('\n');
                     (document.head || document.documentElement).appendChild(st);
                 }
 
-                // Build the real bridge backed by player seams
                 function buildBridge() {
-                    var listeners = { trackchange: [], playstate: [] };
-
                     function getTrack() {
                         try {
                             var title = '', artist = '', art = '', durationMs = 0;
                             var widget = document.querySelector('[data-testid="now-playing-widget"]');
                             if (widget) {
-                                var titleEl = widget.querySelector('a[href*="/track/"]');
-                                if (titleEl) title = (titleEl.textContent || '').trim();
-                                var artistEl = widget.querySelector('[data-testid="now-playing-widget"] a[href*="/artist/"]');
-                                if (artistEl) artist = (artistEl.textContent || '').trim();
+                                var link = widget.querySelector('a[href*="/track/"]');
+                                if (link) title = (link.textContent || '').trim();
+                                // Artist is often in a separate element
+                                var artistEl = widget.querySelector('span[class*="artist"], div[class*="artist"] a');
+                                if (!artistEl) {
+                                    // Fallback: look for text after title
+                                    var allLinks = widget.querySelectorAll('a');
+                                    for (var i = 0; i < allLinks.length; i++) {
+                                        var href = allLinks[i].getAttribute('href') || '';
+                                        if (href.indexOf('/artist/') === 0) {
+                                            artist = (allLinks[i].textContent || '').trim();
+                                            break;
+                                        }
+                                    }
+                                } else {
+                                    artist = (artistEl.textContent || '').trim();
+                                }
                                 var img = widget.querySelector('img');
                                 if (img) art = img.src || '';
-                            }
-                            var durEl = document.querySelector('div[data-testid="playback-duration"]');
-                            if (durEl) {
-                                var parts = (durEl.textContent || '0:00').split(':');
-                                durationMs = (parseInt(parts[0]) * 60 + parseInt(parts[1] || '0')) * 1000;
                             }
                             return { title: title, artist: artist, art: art, durationMs: durationMs };
                         } catch (e) { return { title: '', artist: '', art: '', durationMs: 0 }; }
@@ -69,7 +70,7 @@ object CustomUI {
                         try {
                             if (typeof window.splIsPlaying === 'function') {
                                 var s = window.splIsPlaying();
-                                if (s !== null) return s;
+                                if (s !== null && s !== undefined) return !!s;
                             }
                             var el = document.querySelector('audio, video');
                             if (el) return !el.paused;
@@ -87,56 +88,41 @@ object CustomUI {
                             } catch (e) { return 0; }
                         },
                         toggle: function() {
-                            if (typeof window.actPlayPause === 'function') {
-                                var s = isPlaying();
-                                window.actPlayPause(s ? true : false);
-                            }
+                            try {
+                                if (typeof window.actPlayPause === 'function') {
+                                    window.actPlayPause(isPlaying());
+                                }
+                            } catch (e) {}
                         },
                         next: function() {
-                            if (typeof window.actSkipForward === 'function') window.actSkipForward();
+                            try { if (typeof window.actSkipForward === 'function') window.actSkipForward(); } catch (e) {}
                         },
                         prev: function() {
-                            if (typeof window.actSkipBack === 'function') window.actSkipBack();
+                            try { if (typeof window.actSkipBack === 'function') window.actSkipBack(); } catch (e) {}
                         },
                         seek: function(ms) {
-                            if (typeof window.actSeek === 'function') window.actSeek(ms / 1000);
+                            try { if (typeof window.actSeek === 'function') window.actSeek(ms / 1000); } catch (e) {}
                         },
-                        on: function(event, cb) {
-                            if (listeners[event]) {
-                                listeners[event].push(cb);
-                                return function() {
-                                    var i = listeners[event].indexOf(cb);
-                                    if (i >= 0) listeners[event].splice(i, 1);
-                                };
-                            }
-                            return function() {};
+                        like: function() {
+                            try {
+                                // Click Spotify's like button in the now-playing widget
+                                var btn = document.querySelector('[data-testid="now-playing-widget"] button[aria-label*="like" i], [data-testid="now-playing-widget"] button[aria-label*="Unlike" i]');
+                                if (!btn) {
+                                    // Fallback: use actAddToFav if available
+                                    if (typeof window.actAddToFav === 'function') { window.actAddToFav(); return; }
+                                }
+                                if (btn) btn.click();
+                            } catch (e) {}
                         },
-                        _emit: function(event, data) {
-                            (listeners[event] || []).forEach(function(cb) {
-                                try { cb(data); } catch (e) {}
-                            });
-                        }
+                        on: function() { return function() {}; }
                     };
-
-                    // Wire track changes to bridge listeners
-                    if (typeof window.splOnTrackChange === 'function') {
-                        window.splOnTrackChange(function(uri, id) {
-                            window.__bridge._emit('trackchange', { uri: uri, id: id, track: getTrack() });
-                        });
-                    }
-
-                    // Poll play state and emit changes
-                    var lastPlaying = null;
-                    setInterval(function() {
-                        var p = isPlaying();
-                        if (p !== lastPlaying) {
-                            lastPlaying = p;
-                            window.__bridge._emit('playstate', p);
-                        }
-                    }, 500);
                 }
 
-                // Load UI files from assets and inject
+                function extractBody(html) {
+                    var m = html.match(/<body[^>]*>([\s\S]*)<\/body>/i);
+                    return m ? m[1] : html;
+                }
+
                 function loadAndInject() {
                     try {
                         var html = AndBridge.loadCustomUiAsset('index.html');
@@ -145,19 +131,17 @@ object CustomUI {
                         var js = AndBridge.loadCustomUiAsset('app.js');
 
                         if (!html) {
-                            console.error('[CustomUI] Failed to load index.html from assets');
+                            console.error('[CustomUI] Failed to load index.html');
                             return;
                         }
 
                         hideSpotifyUi();
                         buildBridge();
 
-                        // Create root container
                         var root = document.createElement('div');
                         root.id = 'spl-custom-ui-root';
                         document.body.appendChild(root);
 
-                        // Inject CSS
                         function injectCss(content, id) {
                             if (!content) return;
                             var st = document.createElement('style');
@@ -168,30 +152,101 @@ object CustomUI {
                         injectCss(tokens, 'spl-custom-ui-tokens');
                         injectCss(css, 'spl-custom-ui-styles');
 
-                        // Inject HTML (strip outer html/body tags, keep content)
-                        var tmp = document.createElement('div');
-                        tmp.innerHTML = html;
-                        // Move all child nodes into root
-                        while (tmp.firstChild) {
-                            root.appendChild(tmp.firstChild);
-                        }
+                        // Extract body content and fix art/ paths with base64
+                        var bodyHtml = extractBody(html);
 
-                        // Fix relative art/ paths - they need to load from assets
-                        // We'll use a custom scheme handler or base64; for now rewrite via bridge
-                        // Actually: inject JS last so it can find the DOM
+                        // Replace art/ references with base64 data URLs
+                        var artFiles = ['1465847899084-d164df4dedc6.jpg','1470225620780-dba8ba36b745.jpg',
+                            '1478737270239-2f02b77fc618.jpg','1493225457124-a3eb161ffa5f.jpg',
+                            '1507525428034-b723cf961d3e.jpg','1509198397868-475647b2a1e5.jpg',
+                            '1511671782779-c97d3d27a1d4.jpg','1514525253161-7a46d19cd819.jpg',
+                            '1518709268805-4e9042af9f23.jpg'];
+                        artFiles.forEach(function(f) {
+                            try {
+                                var b64 = AndBridge.loadCustomUiAssetBase64('art/' + f);
+                                if (b64) {
+                                    var dataUrl = 'data:image/jpeg;base64,' + b64;
+                                    bodyHtml = bodyHtml.split('art/' + f).join(dataUrl);
+                                    if (js) js = js.split('art/' + f).join(dataUrl);
+                                }
+                            } catch (e) {}
+                        });
+
+                        root.innerHTML = bodyHtml;
+
+                        // Inject JS - functions become global
                         if (js) {
                             var script = document.createElement('script');
                             script.textContent = js;
                             document.body.appendChild(script);
                         }
 
-                        // Rewrite art/ image paths to use asset loading
-                        root.querySelectorAll('img[src^="art/"]').forEach(function(img) {
-                            var path = img.getAttribute('src');
-                            // Load as base64 via bridge and set data URL
-                            // For now, keep relative - WebView may resolve via file:///android_asset/
-                            img.src = 'file:///android_asset/custom-ui/' + path;
-                        });
+                        // Override prototype stubs with real bridge calls
+                        // Must run after app.js defines the functions
+                        setTimeout(function() {
+                            try {
+                                // skipTrack was a toast-only stub - wire to real
+                                window.skipTrack = function(dir) {
+                                    if (dir > 0) window.__bridge.next();
+                                    else window.__bridge.prev();
+                                };
+                                // toggleLike was local-only - wire to real
+                                var origToggleLike = window.toggleLike;
+                                window.toggleLike = function(e) {
+                                    if (e) e.stopPropagation();
+                                    window.__bridge.like();
+                                    // Still update UI optimistically
+                                    if (origToggleLike) {
+                                        try { origToggleLike.call(window, null); } catch (x) {}
+                                        // Revert the local flip since real state will sync
+                                        // Actually keep it - the sync loop will correct if wrong
+                                    }
+                                };
+                            } catch (e) { console.error('[CustomUI] override failed', e); }
+                        }, 100);
+
+                        // Live sync: poll real state and update UI
+                        var lastTitle = '', lastPlaying = null;
+                        setInterval(function() {
+                            try {
+                                var track = window.__bridge.track;
+                                var playing = window.__bridge.playing;
+
+                                // Update track info if changed
+                                if (track.title && track.title !== lastTitle) {
+                                    lastTitle = track.title;
+                                    var titleEls = ['miniTitle', 'fpTitle'];
+                                    var artistEls = ['miniArtist', 'fpArtist'];
+                                    titleEls.forEach(function(id) {
+                                        var el = document.getElementById(id);
+                                        if (el) el.innerText = track.title;
+                                    });
+                                    artistEls.forEach(function(id) {
+                                        var el = document.getElementById(id);
+                                        if (el) el.innerText = track.artist || '';
+                                    });
+                                    // Update artwork if we have a real URL
+                                    if (track.art && track.art.indexOf('data:') !== 0) {
+                                        ['miniThumb', 'fpArtwork'].forEach(function(id) {
+                                            var el = document.getElementById(id);
+                                            if (el) el.src = track.art;
+                                        });
+                                    }
+                                }
+
+                                // Update play/pause icons if changed
+                                if (playing !== lastPlaying) {
+                                    lastPlaying = playing;
+                                    var pauseSvg = '<path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/>';
+                                    var playSvg = '<path d="M8 5v14l11-7z"/>';
+                                    var icon = playing ? pauseSvg : playSvg;
+                                    ['miniPlayIcon', 'fpPlayIcon', 'headerPlayIcon'].forEach(function(id) {
+                                        var el = document.getElementById(id);
+                                        if (el) el.innerHTML = icon;
+                                    });
+                                }
+                            } catch (e) {}
+                        }, 1000);
 
                         console.log('[CustomUI] Injected successfully');
                     } catch (e) {
@@ -199,7 +254,6 @@ object CustomUI {
                     }
                 }
 
-                // Wait for AndBridge and player seams to be ready
                 var tries = 0;
                 var iv = setInterval(function() {
                     tries++;

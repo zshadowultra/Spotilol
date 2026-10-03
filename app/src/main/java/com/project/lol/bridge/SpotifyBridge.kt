@@ -258,6 +258,22 @@ class SpotifyBridge(activityRef: WeakReference<Activity>) {
 
     @Suppress("unused")
     @JavascriptInterface
+    fun loadCustomUiAssetBase64(name: String?): String {
+        val activity = activityRef.get() ?: return ""
+        if (name.isNullOrBlank()) return ""
+        if (name.contains("..") || name.startsWith("/")) return ""
+        return try {
+            activity.assets.open("custom-ui/$name").use { input ->
+                android.util.Base64.encodeToString(input.readBytes(), android.util.Base64.NO_WRAP)
+            }
+        } catch (e: Exception) {
+            Logger.e(TAG, "loadCustomUiAssetBase64 failed for $name", e)
+            ""
+        }
+    }
+
+    @Suppress("unused")
+    @JavascriptInterface
     fun nFetch(url: String, optsJson: String?): String {
         val errorResult = { e: Exception ->
             try {
