@@ -241,7 +241,7 @@ class MainActivity : ComponentActivity() {
         Logger.s(
             TAG,
             "session: loggedIn=$loggedIn service=${serviceEnabledState.value} mode=${prefs.getString("ConnectionMode", "normal")} " +
-                "engine=${prefs.getString("PlayerMode", "spotilol")} proxyRunning=${LocalProxyManager.isRunning} " +
+                "engine=${prefs.getString("PlayerMode", "customui")} proxyRunning=${LocalProxyManager.isRunning} " +
                 "deeplink=${pendingLink ?: "none"} logging=${com.project.lol.util.Logger.isEnabled()}"
         )
 

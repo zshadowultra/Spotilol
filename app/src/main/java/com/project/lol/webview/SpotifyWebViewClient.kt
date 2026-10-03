@@ -313,7 +313,7 @@ class SpotifyWebViewClient(
         val closeNowPlay = prefs.getBoolean("CloseNowPlay", true)
         val amoledEnabled = prefs.getBoolean("AmoledTheme", true)
         val customCss = prefs.getString("CustomCss", "") ?: ""
-        val playerMode = prefs.getString("PlayerMode", "spotilol") ?: "spotilol"
+        val playerMode = prefs.getString("PlayerMode", "customui") ?: "spotilol"
         val useProxy = prefs.getString("ConnectionMode", "normal") == "proxy"
         val debugOverlay = Logger.isEnabled()
         val takeControl = prefs.getBoolean("TakeControl", true)
@@ -383,6 +383,9 @@ class SpotifyWebViewClient(
             if (playerMode == "spotilol") {
                 append(SpotilolPlayer.CONTENT)
             }
+            if (playerMode == "customui") {
+                append(CustomUI.CONTENT)
+            }
         }
         val cleanJs = JsUtils.stripConsoleLogs(js) + "\n" +
                 buildAmoledJs(amoledEnabled) + "\n" +
@@ -411,7 +414,7 @@ class SpotifyWebViewClient(
             Logger.d(TAG, "pref changed: $key")
             when (key) {
                 "PlayerMode" ->
-                    switchPlayerMode(wv, prefs.getString("PlayerMode", "spotilol") ?: "spotilol")
+                    switchPlayerMode(wv, prefs.getString("PlayerMode", "customui") ?: "spotilol")
                 "PowerSave" -> {
                     val on = prefs.getBoolean("PowerSave", false)
                     wv.evaluateJavascript("if(window.__splApplyPowerSave) window.__splApplyPowerSave($on);", null)

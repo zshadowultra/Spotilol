@@ -238,7 +238,7 @@ fun SettingsContent(
     var btAutoPause by remember { mutableStateOf(prefs.getBoolean("BtAutoPause", false)) }
     var btAutoResume by remember { mutableStateOf(prefs.getBoolean("BtAutoResume", false)) }
     var hpAutoResume by remember { mutableStateOf(prefs.getBoolean("HpAutoResume", false)) }
-    var playerMode by remember { mutableStateOf(prefs.getString("PlayerMode", "spotilol") ?: "spotilol") }
+    var playerMode by remember { mutableStateOf(prefs.getString("PlayerMode", "customui") ?: "spotilol") }
     var connectionMode by remember { mutableStateOf(prefs.getString("ConnectionMode", "normal") ?: "normal") }
     var offlineMode by remember { mutableStateOf(prefs.getBoolean("OfflineMode", false)) }
     var blockSW by remember { mutableStateOf(blockServiceWorker) }
@@ -1060,6 +1060,7 @@ fun SettingsContent(
         SingleChoiceDialog(
             title = stringResource(R.string.settings_player_mode),
             options = listOf(
+                "customui" to stringResource(R.string.settings_player_customui),
                 "spotilol" to stringResource(R.string.settings_player_spotilol),
                 "original" to stringResource(R.string.settings_player_original)
             ),

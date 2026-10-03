@@ -1,0 +1,752 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <title>Spotify Android UI</title>
+  <link rel="stylesheet" href="tokens.css">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div class="app-root">
+
+    <!-- Scrollable Viewport -->
+    <div class="content-scroll" id="mainScrollArea">
+      
+      <!-- STICKY TOP APP BAR (WHITE ACTIVE CHIPS) -->
+      <header class="top-app-bar" id="mainHeader">
+        <div class="user-avatar" onclick="openProfileMenu()">Z</div>
+        <div class="filter-chips">
+          <button class="chip active" onclick="filterChip(this, 'All')">All</button>
+          <button class="chip" onclick="filterChip(this, 'Music')">Music</button>
+          <button class="chip" onclick="filterChip(this, 'Podcasts')">Podcasts</button>
+        </div>
+      </header>
+
+      <!-- 1. HOME TAB -->
+      <section class="tab-view active" id="tabHome">
+        <div class="home-view">
+          
+          <div class="recents-grid" id="homeGrid">
+            <div class="recent-card" onclick="openPlaylistView()">
+              <div class="recent-thumb purple-heart">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="var(--sp-white)">
+                  <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
+                </svg>
+              </div>
+              <span class="recent-title">Liked Songs</span>
+            </div>
+
+            <div class="recent-card" onclick="playSong('Do The Dash', 'Various Artists', 'art/1518709268805-4e9042af9f23.jpg', 'sp-accent-do-the-dash')">
+              <img class="recent-thumb" src="art/1518709268805-4e9042af9f23.jpg" alt="Do The Dash" />
+              <span class="recent-title">Do The Dash</span>
+            </div>
+
+            <div class="recent-card" onclick="playSong('Discover Weekly', 'Spotify', 'art/1511671782779-c97d3d27a1d4.jpg', 'sp-accent-discover-weekly')">
+              <img class="recent-thumb" src="art/1511671782779-c97d3d27a1d4.jpg" alt="Discover Weekly" />
+              <span class="recent-title">Discover Weekly</span>
+            </div>
+
+            <div class="recent-card" onclick="playSong('Chill Mix', 'Spotify', 'art/1470225620780-dba8ba36b745.jpg', 'sp-accent-chill-mix')">
+              <img class="recent-thumb" src="art/1470225620780-dba8ba36b745.jpg" alt="Chill Mix" />
+              <span class="recent-title">Chill Mix</span>
+            </div>
+
+            <div class="recent-card" onclick="playSong('Daily Mix 1', 'Spotify', 'art/1493225457124-a3eb161ffa5f.jpg', 'sp-accent-daily-mix-1')">
+              <img class="recent-thumb" src="art/1493225457124-a3eb161ffa5f.jpg" alt="Daily Mix 1" />
+              <span class="recent-title">Daily Mix 1</span>
+            </div>
+
+            <div class="recent-card" onclick="playSong('Daily Mix 6', 'Spotify', 'art/1514525253161-7a46d19cd819.jpg', 'sp-accent-daily-mix-6')">
+              <img class="recent-thumb" src="art/1514525253161-7a46d19cd819.jpg" alt="Daily Mix 6" />
+              <span class="recent-title">Daily Mix 6</span>
+            </div>
+          </div>
+
+          <h2 class="section-title">Pre-save upcoming releases</h2>
+          <div class="release-scroll">
+            <div class="release-card" onclick="playSong('Answers', 'Bibio, Dorian Concept', 'art/1507525428034-b723cf961d3e.jpg', 'sp-accent-answers')">
+              <img class="release-cover" src="art/1507525428034-b723cf961d3e.jpg" alt="Answers" />
+              <div class="release-name">Answers</div>
+              <div class="release-artist">Bibio, Dorian Concept</div>
+            </div>
+
+            <div class="release-card" onclick="playSong('Paiinted Feeliings', 'Talwiinder', 'art/1509198397868-475647b2a1e5.jpg', 'sp-accent-painted-feelings')">
+              <img class="release-cover" src="art/1509198397868-475647b2a1e5.jpg" alt="Paiinted Feeliings" />
+              <div class="release-name">Paiinted Feeliings</div>
+              <div class="release-artist">Talwiinder</div>
+            </div>
+
+            <div class="release-card" onclick="playSong('Echoes', 'ASTXR', 'art/1465847899084-d164df4dedc6.jpg', 'sp-accent-echoes')">
+              <img class="release-cover" src="art/1465847899084-d164df4dedc6.jpg" alt="Echoes" />
+              <div class="release-name">Echoes</div>
+              <div class="release-artist">ASTXR</div>
+            </div>
+          </div>
+
+        </div>
+      </section>
+
+      <!-- 2. SEARCH TAB (ROTATED GENRE ARTWORKS) -->
+      <section class="tab-view" id="tabSearch">
+        <div class="search-view">
+          <h2 class="section-title-search">Search</h2>
+          
+          <div class="search-input-wrapper" onclick="document.getElementById('searchInput').focus()">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="var(--sp-black-deep)">
+              <path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/>
+            </svg>
+            <input type="text" class="search-input" id="searchInput" placeholder="What do you want to play?" oninput="handleSearch(this.value)" />
+            <button class="search-clear-btn search-clear-hidden" id="searchClearBtn" onclick="clearSearch()" aria-label="Clear search"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round"><path d="M5 5l14 14M19 5L5 19"/></svg></button>
+            <svg class="search-clear-spacing" width="20" height="20" viewBox="0 0 24 24" fill="var(--sp-black-deep)">
+              <path d="M12 15c1.66 0 3-1.34 3-3V6c0-1.66-1.34-3-3-3S9 4.34 9 6v6c0 1.66 1.34 3 3 3zm-1-9c0-.55.45-1 1-1s1 .45 1 1v6c0 .55-.45 1-1 1s-1-.45-1-1V6zm6 6c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-2.08c3.39-.49 6-3.39 6-6.92h-2z"/>
+            </svg>
+          </div>
+
+          <!-- Live Results Area -->
+          <div id="searchResultsArea" class="search-results-hidden">
+            <div class="filter-chips filter-chips-search">
+              <button class="chip active" onclick="filterChip(this, 'All')">All</button>
+              <button class="chip" onclick="filterChip(this, 'Songs')">Songs</button>
+              <button class="chip" onclick="filterChip(this, 'Playlists')">Playlists</button>
+              <button class="chip" onclick="filterChip(this, 'Albums')">Albums</button>
+            </div>
+
+            <div class="top-result-card" onclick="playSong('Test & Recognise - Flume Re-work', 'Seekae, Flume', 'art/1518709268805-4e9042af9f23.jpg', 'sp-accent-test-recognise')">
+              <div class="top-result-info">
+                <img class="top-result-thumb" src="art/1518709268805-4e9042af9f23.jpg" alt="Top Result" />
+                <div>
+                  <div class="top-result-title">Test & Recognise - Flume Re-work</div>
+                  <div class="top-result-sub">Song • Seekae, Flume</div>
+                </div>
+              </div>
+              <button class="play-btn-circle play-btn-circle-top-result">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M8 5v14l11-7z"/>
+                </svg>
+              </button>
+            </div>
+
+            <div class="song-list song-list-no-pad">
+              <div class="song-row" onclick="playSong('tesla - slowed electro mix', 'Fixupboy', 'art/1514525253161-7a46d19cd819.jpg', 'sp-accent-tesla')">
+                <img class="song-art" src="art/1514525253161-7a46d19cd819.jpg" alt="Tesla" />
+                <div class="song-info">
+                  <div class="song-name">tesla - slowed electro mix</div>
+                  <div class="song-subtitle">Song • Fixupboy</div>
+                </div>
+                <button class="song-more" onclick="openSongMenu(event, 'tesla - slowed electro mix', 'Fixupboy', 'art/1514525253161-7a46d19cd819.jpg)">⋮</button>
+              </div>
+
+              <div class="song-row" onclick="playSong('Testosterone (Ultra Slowed)', 'NYCKØ', 'art/1509198397868-475647b2a1e5.jpg', 'sp-accent-testosterone')">
+                <img class="song-art" src="art/1509198397868-475647b2a1e5.jpg" alt="Testosterone" />
+                <div class="song-info">
+                  <div class="song-name">Testosterone (Ultra Slowed)</div>
+                  <div class="song-subtitle">Song • NYCKØ</div>
+                </div>
+                <button class="song-more" onclick="openSongMenu(event, 'Testosterone (Ultra Slowed)', 'NYCKØ', 'art/1509198397868-475647b2a1e5.jpg)">⋮</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Default Browse View with Rotated Artworks -->
+          <div id="defaultBrowseArea">
+            <h3 class="section-title-browse">Browse all</h3>
+            <div class="browse-grid">
+              <div class="browse-card browse-podcasts" onclick="showToast('Browsing Podcasts')">
+                <span class="browse-card-title">Podcasts</span>
+                <img class="browse-card-artwork" src="art/1478737270239-2f02b77fc618.jpg" alt="" />
+              </div>
+              
+              <div class="browse-card browse-made-for-you" onclick="showToast('Browsing Made For You')">
+                <span class="browse-card-title">Made For You</span>
+                <img class="browse-card-artwork" src="art/1511671782779-c97d3d27a1d4.jpg" alt="" />
+              </div>
+
+              <div class="browse-card browse-charts" onclick="showToast('Browsing Charts')">
+                <span class="browse-card-title">Charts</span>
+                <img class="browse-card-artwork" src="art/1514525253161-7a46d19cd819.jpg" alt="" />
+              </div>
+
+              <div class="browse-card browse-new-releases" onclick="showToast('Browsing New Releases')">
+                <span class="browse-card-title">New Releases</span>
+                <img class="browse-card-artwork" src="art/1509198397868-475647b2a1e5.jpg" alt="" />
+              </div>
+
+              <div class="browse-card browse-discover" onclick="showToast('Browsing Discover')">
+                <span class="browse-card-title">Discover</span>
+                <img class="browse-card-artwork" src="art/1470225620780-dba8ba36b745.jpg" alt="" />
+              </div>
+
+              <div class="browse-card browse-live-events" onclick="showToast('Browsing Live Events')">
+                <span class="browse-card-title">Live Events</span>
+                <img class="browse-card-artwork" src="art/1493225457124-a3eb161ffa5f.jpg" alt="" />
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </section>
+
+      <!-- 3. LIBRARY TAB -->
+      <section class="tab-view" id="tabLibrary">
+        <div class="library-view">
+          <div class="library-header">
+            <h2 class="library-title">Your Library</h2>
+            <div class="library-actions">
+              <button class="icon-btn" onclick="showToast('Search your library')" aria-label="Search library">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/>
+                </svg>
+              </button>
+              <button class="icon-btn" onclick="openCreateMenu()" aria-label="Create">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/>
+                </svg>
+              </button>
+            </div>
+          </div>
+
+          <div class="filter-chips">
+            <button class="chip active" onclick="filterChip(this, 'Playlists')">Playlists</button>
+            <button class="chip" onclick="filterChip(this, 'Podcasts')">Podcasts</button>
+            <button class="chip" onclick="filterChip(this, 'Albums')">Albums</button>
+            <button class="chip" onclick="filterChip(this, 'Artists')">Artists</button>
+          </div>
+
+          <div class="library-sort-row">
+            <button class="sort-btn" onclick="openSortMenu()">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M3 18h6v-2H3v2zM3 6v2h18V6H3zm0 7h12v-2H3v2z"/>
+              </svg>
+              <span id="currentSortLabel">Recents</span>
+            </button>
+            <button class="icon-btn" onclick="showToast('View mode changed')" aria-label="Change view mode">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M4 11h5V5H4v6zm0 7h5v-6H4v6zm6 0h5v-6h-5v6zm6 0h5v-6h-5v6zm-6-7h5V5h-5v6zm6-6v6h5V5h-5z"/>
+              </svg>
+            </button>
+          </div>
+
+          <div class="song-list song-list-no-pad">
+               <div class="song-row" onclick="openPlaylistView()">
+               <div class="song-art purple-heart">
+                 <svg width="22" height="22" viewBox="0 0 24 24" fill="var(--sp-white)">
+                   <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
+                 </svg>
+               </div>
+               <div class="song-info">
+                 <div class="song-name">Liked Songs</div>
+                  <div class="song-subtitle"><span class="song-pin"><svg width="14" height="14" viewBox="0 0 24 24" fill="var(--sp-text-secondary)"><path d="M16 9V4h1c.55 0 1-.45 1-1s-.45-1-1-1H7c-.55 0-1 .45-1 1s.45 1 1 1h1v5c0 1.66-1.34 3-3 3v2h5.97v7l1 1 1-1v-7H19v-2c-1.66 0-3-1.34-3-3z"/></svg></span> Playlist • 496 songs</div>
+               </div>
+              <button class="song-more" onclick="openSongMenu(event, 'Liked Songs', '496 songs', 'art/1518709268805-4e9042af9f23.jpg)">⋮</button>
+            </div>
+
+            <div class="song-row" onclick="playSong('Chest Pain (I Love) Radio', 'Spotify', 'art/1514525253161-7a46d19cd819.jpg', 'sp-accent-chest-pain')">
+              <img class="song-art" src="art/1514525253161-7a46d19cd819.jpg" alt="Chest Pain" />
+              <div class="song-info">
+                <div class="song-name">Chest Pain (I Love) Radio</div>
+                  <div class="song-subtitle"><span class="song-pin"><svg width="14" height="14" viewBox="0 0 24 24" fill="var(--sp-text-secondary)"><path d="M16 9V4h1c.55 0 1-.45 1-1s-.45-1-1-1H7c-.55 0-1 .45-1 1s.45 1 1 1h1v5c0 1.66-1.34 3-3 3v2h5.97v7l1 1 1-1v-7H19v-2c-1.66 0-3-1.34-3-3z"/></svg></span> Playlist • Made for zshadowultra</div>
+              </div>
+              <button class="song-more" onclick="openSongMenu(event, 'Chest Pain (I Love) Radio', 'Spotify', 'art/1514525253161-7a46d19cd819.jpg)">⋮</button>
+            </div>
+
+            <div class="song-row" onclick="showToast('Opening New Folder (28 playlists)')">
+              <div class="song-art song-art-folder"><svg width="22" height="22" viewBox="0 0 24 24" fill="var(--sp-text-secondary)"><path d="M10 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z"/></svg></div>
+              <div class="song-info">
+                <div class="song-name">New Folder</div>
+                <div class="song-subtitle">28 playlists</div>
+              </div>
+              <button class="song-more" onclick="openSongMenu(event, 'New Folder', '28 playlists', 'art/1514525253161-7a46d19cd819.jpg)">⋮</button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 4. LIKED SONGS PLAYLIST (PIXEL-ALIGNED) -->
+      <section class="playlist-view" id="playlistLiked">
+        <div class="playlist-header">
+          <button class="back-btn" onclick="closePlaylistView()">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/>
+            </svg>
+          </button>
+          <h1 class="playlist-title-large">Liked Songs</h1>
+          <div class="playlist-stats">496 songs • over 24 hr</div>
+          
+          <!-- Perfectly Center-Aligned Action Row -->
+          <div class="playlist-actions-row">
+            <div class="left-actions-group">
+              <!-- Downloaded icon badge -->
+              <button class="icon-btn" onclick="showToast('Downloaded to device')" aria-label="Downloaded">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="var(--sp-green)">
+                  <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
+                </svg>
+              </button>
+              <!-- Shuffle -->
+              <button class="icon-btn" onclick="showToast('Shuffle toggled')" aria-label="Shuffle">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="var(--sp-text-secondary)">
+                  <path d="M10.59 9.17L5.41 4 4 5.41l5.17 5.17 1.42-1.41zM14.5 4l2.04 2.04L4 18.59 5.41 20 17.96 7.46 20 9.5V4h-5.5zm.33 9.42l-1.41 1.41 3.13 3.13L14.5 20H20v-5.5l-2.04 2.04-3.13-3.12z"/>
+                </svg>
+              </button>
+              <!-- Context menu -->
+              <button class="icon-btn" onclick="openSongMenu(event, 'Liked Songs', '496 songs', 'art/1518709268805-4e9042af9f23.jpg')" aria-label="More options">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="var(--sp-text-secondary)">
+                  <circle cx="12" cy="5" r="2"/>
+                  <circle cx="12" cy="12" r="2"/>
+                  <circle cx="12" cy="19" r="2"/>
+                </svg>
+              </button>
+            </div>
+            
+            <button class="play-btn-circle" onclick="togglePlayState()">
+              <svg id="headerPlayIcon" width="26" height="26" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M8 5v14l11-7z"/>
+              </svg>
+            </button>
+          </div>
+        </div>
+
+        <div class="song-list">
+          <div class="song-row" onclick="playSong('CONGASO - Totally Slowed', 'ASTXR, Bumishen\'ka', 'art/1509198397868-475647b2a1e5.jpg', 'sp-accent-congaso')">
+            <img class="song-art" src="art/1509198397868-475647b2a1e5.jpg" alt="Congaso" />
+            <div class="song-info">
+              <div class="song-name">CONGASO - Totally Slowed</div>
+              <div class="song-subtitle">
+                <span class="badge-check-circle"><svg viewBox="0 0 24 24"><path d="M9 16.2L4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4L9 16.2z"/></svg></span>
+                <span>ASTXR, Bumishen'ka</span>
+              </div>
+            </div>
+            <button class="song-more" onclick="openSongMenu(event, 'CONGASO - Totally Slowed', 'ASTXR, Bumishen\'ka', 'art/1509198397868-475647b2a1e5.jpg)">⋮</button>
+          </div>
+
+          <div class="song-row" onclick="playSong('Dark Beach - Slowed', 'Pastel Ghost', 'art/1470225620780-dba8ba36b745.jpg', 'sp-accent-dark-beach')">
+            <img class="song-art" src="art/1470225620780-dba8ba36b745.jpg" alt="Dark Beach" />
+            <div class="song-info">
+              <div class="song-name">Dark Beach - Slowed</div>
+              <div class="song-subtitle">
+                <span class="badge-check-circle"><svg viewBox="0 0 24 24"><path d="M9 16.2L4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4L9 16.2z"/></svg></span>
+                <span>Pastel Ghost</span>
+              </div>
+            </div>
+            <button class="song-more" onclick="openSongMenu(event, 'Dark Beach - Slowed', 'Pastel Ghost', 'art/1470225620780-dba8ba36b745.jpg)">⋮</button>
+          </div>
+
+          <div class="song-row" onclick="playSong('Joga Vou Pon X Doyuin', 'Triplerxr', 'art/1511671782779-c97d3d27a1d4.jpg', 'sp-accent-joga')">
+            <img class="song-art" src="art/1511671782779-c97d3d27a1d4.jpg" alt="Joga" />
+            <div class="song-info">
+              <div class="song-name">Joga Vou Pon X Doyuin</div>
+              <div class="song-subtitle">
+                <span class="badge-check-circle"><svg viewBox="0 0 24 24"><path d="M9 16.2L4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4L9 16.2z"/></svg></span>
+                <span>Triplerxr</span>
+              </div>
+            </div>
+            <button class="song-more" onclick="openSongMenu(event, 'Joga Vou Pon X Doyuin', 'Triplerxr', 'art/1511671782779-c97d3d27a1d4.jpg)">⋮</button>
+          </div>
+
+          <div class="song-row" onclick="playSong('Heartbeat', 'Childish Gambino', 'art/1493225457124-a3eb161ffa5f.jpg', 'sp-accent-heartbeat')">
+            <img class="song-art" src="art/1493225457124-a3eb161ffa5f.jpg" alt="Heartbeat" />
+            <div class="song-info">
+              <div class="song-name">Heartbeat</div>
+              <div class="song-subtitle">
+                <span class="badge-check-circle"><svg viewBox="0 0 24 24"><path d="M9 16.2L4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4L9 16.2z"/></svg></span>
+                <span>Childish Gambino</span>
+              </div>
+            </div>
+            <button class="song-more" onclick="openSongMenu(event, 'Heartbeat', 'Childish Gambino', 'art/1493225457124-a3eb161ffa5f.jpg)">⋮</button>
+          </div>
+
+          <div class="song-row" onclick="playSong('Run Free', 'Deep Chills, IVIE', 'art/1514525253161-7a46d19cd819.jpg', 'sp-accent-run-free')">
+            <img class="song-art" src="art/1514525253161-7a46d19cd819.jpg" alt="Run Free" />
+            <div class="song-info">
+              <div class="song-name">Run Free</div>
+              <div class="song-subtitle">
+                <span class="badge-check-circle"><svg viewBox="0 0 24 24"><path d="M9 16.2L4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4L9 16.2z"/></svg></span>
+                <span>Deep Chills, IVIE</span>
+              </div>
+            </div>
+            <button class="song-more" onclick="openSongMenu(event, 'Run Free', 'Deep Chills, IVIE', 'art/1514525253161-7a46d19cd819.jpg)">⋮</button>
+          </div>
+
+          <div class="song-row" onclick="playSong('Myself', 'Bazzi', 'art/1507525428034-b723cf961d3e.jpg', 'sp-accent-myself')">
+            <img class="song-art" src="art/1507525428034-b723cf961d3e.jpg" alt="Myself" />
+            <div class="song-info">
+              <div class="song-name">Myself</div>
+              <div class="song-subtitle">
+                <span class="badge-check-circle"><svg viewBox="0 0 24 24"><path d="M9 16.2L4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4L9 16.2z"/></svg></span>
+                <span>Bazzi</span>
+              </div>
+            </div>
+            <button class="song-more" onclick="openSongMenu(event, 'Myself', 'Bazzi', 'art/1507525428034-b723cf961d3e.jpg)">⋮</button>
+          </div>
+        </div>
+      </section>
+
+    </div>
+
+    <!-- DOCKED STICKY MINIPLAYER -->
+    <div class="mini-player-wrapper">
+      <div class="mini-player" onclick="openFullPlayer()">
+        <div class="mini-track-group">
+          <img class="mini-thumb" id="miniThumb" src="art/1509198397868-475647b2a1e5.jpg" alt="Cover" />
+          <div class="mini-meta">
+            <span class="mini-title" id="miniTitle">CONGASO - Totally Slowed</span>
+            <span class="mini-artist" id="miniArtist">ASTXR, Bumishen'ka</span>
+          </div>
+        </div>
+
+        <div class="mini-actions" onclick="event.stopPropagation()">
+          <button class="mini-btn" onclick="openDeviceMenu(event)" aria-label="Device">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M6 2h12a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-4v2h2a1 1 0 0 1 0 2H8a1 1 0 0 1 0-2h2v-2H6a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2z"/>
+            </svg>
+          </button>
+
+          <button class="mini-btn" id="miniLikeBtn" onclick="toggleLike(event)" aria-label="Like">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="var(--sp-green)">
+              <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
+            </svg>
+          </button>
+
+          <button class="mini-btn" onclick="togglePlayState()" aria-label="Play">
+            <svg id="miniPlayIcon" width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/>
+            </svg>
+          </button>
+        </div>
+
+        <div class="mini-progress-bar">
+          <div class="mini-progress-fill" id="miniProgressFill"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- STICKY 3-TAB BOTTOM NAVIGATION -->
+    <nav class="bottom-nav">
+      <button class="nav-tab active" onclick="switchTab('Home', this)">
+        <svg viewBox="0 0 24 24">
+          <path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/>
+        </svg>
+        <span>Home</span>
+      </button>
+
+      <button class="nav-tab" onclick="switchTab('Search', this)">
+        <svg viewBox="0 0 24 24">
+          <path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/>
+        </svg>
+        <span>Search</span>
+      </button>
+
+      <button class="nav-tab" onclick="switchTab('Library', this)">
+        <svg viewBox="0 0 24 24">
+          <path d="M4 6H2v14c0 1.1.9 2 2 2h14v-2H4V6zm16-4H8c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm-1 9H9V9h10v2zm-4 4H9v-2h6v2zm4-8H9V5h10v2z"/>
+        </svg>
+        <span>Your Library</span>
+      </button>
+    </nav>
+
+    <!-- FULL SCREEN PLAYER (DYNAMIC ACCENT GRADIENTS) -->
+    <div class="full-player-overlay" id="fullPlayer">
+      <div class="fp-top-bar">
+        <button class="fp-minimize-btn" onclick="closeFullPlayer()">
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M7.41 8.59L12 13.17l4.59-4.58L18 10l-6 6-6-6 1.41-1.41z"/>
+          </svg>
+        </button>
+
+        <div class="fp-context">
+          <div class="fp-context-sub">Playing From Playlist</div>
+          <div class="fp-context-title">Liked Songs</div>
+        </div>
+
+        <button class="fp-minimize-btn" onclick="openCurrentTrackMenu()">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor">
+            <circle cx="12" cy="5" r="2"/>
+            <circle cx="12" cy="12" r="2"/>
+            <circle cx="12" cy="19" r="2"/>
+          </svg>
+        </button>
+      </div>
+
+      <div class="fp-artwork-container">
+        <img class="fp-artwork" id="fpArtwork" src="art/1509198397868-475647b2a1e5.jpg" alt="Full Artwork" />
+      </div>
+
+      <div class="fp-transport">
+        <div class="fp-meta-row">
+          <div>
+            <div class="fp-title" id="fpTitle">CONGASO - Totally Slowed</div>
+            <div class="fp-artist" id="fpArtist">ASTXR, Bumishen'ka</div>
+          </div>
+          <button class="fp-fav-btn" onclick="toggleLike(event)">
+            <svg id="fpHeartIcon" width="26" height="26" viewBox="0 0 24 24" fill="var(--sp-green)">
+              <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
+            </svg>
+          </button>
+        </div>
+
+        <div class="fp-scrubber-group">
+          <input type="range" class="fp-slider" id="fpScrubber" min="0" max="89" value="83" oninput="updateScrubberTime(this.value)" />
+          <div class="fp-timestamps">
+            <span id="fpCurrentTime">1:23</span>
+            <span>1:29</span>
+          </div>
+        </div>
+
+        <div class="fp-controls-deck">
+          <!-- Shuffle Button with Active Indicator Dot -->
+          <button class="fp-control-btn fp-control-shuffle" onclick="showToast('Shuffle on')">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M10.59 9.17L5.41 4 4 5.41l5.17 5.17 1.42-1.41zM14.5 4l2.04 2.04L4 18.59 5.41 20 17.96 7.46 20 9.5V4h-5.5zm.33 9.42l-1.41 1.41 3.13 3.13L14.5 20H20v-5.5l-2.04 2.04-3.13-3.12z"/>
+            </svg>
+            <div class="shuffle-active-dot"></div>
+          </button>
+
+          <!-- Native Bar-and-Triangle Previous Glyph -->
+          <button class="fp-control-btn" onclick="skipTrack(-1)">
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M6 6h2v12H6zm3.5 6l8.5 6V6z"/>
+            </svg>
+          </button>
+
+          <button class="fp-play-large" onclick="togglePlayState()">
+            <svg id="fpPlayIcon" width="30" height="30" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/>
+            </svg>
+          </button>
+
+          <!-- Native Bar-and-Triangle Next Glyph -->
+          <button class="fp-control-btn" onclick="skipTrack(1)">
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z"/>
+            </svg>
+          </button>
+
+          <button class="fp-control-btn fp-control-repeat" onclick="showToast('Repeat all')">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M7 7h10v3l4-4-4-4v3H5v6h2V7zm10 10H7v-3l-4 4 4 4v-3h12v-6h-2v4z"/>
+            </svg>
+          </button>
+        </div>
+
+        <div class="fp-utilities-row">
+          <button class="fp-utility-btn" onclick="openDeviceMenu()" aria-label="Devices">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M6 2h12a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-4v2h2a1 1 0 0 1 0 2H8a1 1 0 0 1 0-2h2v-2H6a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2z"/>
+            </svg>
+          </button>
+
+          <button class="fp-utility-btn" onclick="openShareSheet()" aria-label="Share">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81 1.66 0 3-1.34 3-3s-1.34-3-3-3-3 1.34-3 3c0 .24.04.47.09.7L8.04 9.81C7.5 9.31 6.79 9 6 9c-1.66 0-3 1.34-3 3s1.34 3 3 3c.79 0 1.5-.31 2.04-.81l7.12 4.16c-.05.21-.08.43-.08.65 0 1.61 1.31 2.92 2.92 2.92s2.92-1.31 2.92-2.92c0-1.61-1.31-2.92-2.92-2.92z"/>
+            </svg>
+          </button>
+        </div>
+
+        <div class="fp-lyrics-teaser" onclick="openLyricsView()">
+          <div class="lyrics-tag">Lyrics</div>
+          <div class="lyrics-line">Caught inside the mirror once again...<br>Running out of time to pretend.</div>
+        </div>
+
+      </div>
+    </div>
+
+     <!-- FULL LYRICS OVERLAY -->
+     <div class="full-lyrics-overlay" id="lyricsOverlay">
+       <div class="lyrics-overlay-header">
+         <span class="lyrics-label">Lyrics</span>
+         <button class="lyrics-close-btn" onclick="closeLyricsView()">✕</button>
+       </div>
+      <div class="lyrics-scroll-body">
+        <p>Caught inside the mirror once again</p>
+        <p class="active-line">Running out of time to pretend</p>
+        <p>Every shadow knows my name</p>
+        <p>Nothing ever stays the same</p>
+        <p>Echoes in the silent hall</p>
+        <p>Waiting for the curtain call</p>
+      </div>
+    </div>
+
+    <!-- MODAL BACKDROP -->
+    <div class="modal-backdrop" id="modalBackdrop" onclick="closeAllSheets()"></div>
+
+    <!-- SONG CONTEXT MENU (SEAMLESS HEADER) -->
+    <div class="bottom-sheet" id="songMenuSheet">
+      <div class="sheet-handle"></div>
+      
+      <div class="sheet-track-header">
+        <img class="sheet-thumb" id="menuThumb" src="" alt="Track Art" />
+        <div>
+          <div class="sheet-title" id="menuTitle">Song Title</div>
+          <div class="sheet-artist" id="menuArtist">Artist Name</div>
+        </div>
+      </div>
+
+      <div class="menu-item-row" onclick="actionLikeCurrent()">
+        <svg viewBox="0 0 24 24"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>
+        <span id="menuLikeText">Remove from Liked Songs</span>
+      </div>
+
+      <div class="menu-item-row" onclick="showToast('Added to playlist')">
+        <svg viewBox="0 0 24 24"><path d="M14 10H2v2h12v-2zm0-4H2v2h12V6zm4 8v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zM2 16h8v-2H2v2z"/></svg>
+        <span>Add to playlist</span>
+      </div>
+
+      <div class="menu-item-row" onclick="showToast('Added to queue')">
+        <svg viewBox="0 0 24 24"><path d="M3 13h2v-2H3v2zm0 4h2v-2H3v2zm0-8h2V7H3v2zm4 4h14v-2H7v2zm0 4h14v-2H7v2zM7 7v2h14V7H7z"/></svg>
+        <span>Add to queue</span>
+      </div>
+
+      <div class="menu-item-row" onclick="showToast('Navigating to artist...')">
+        <svg viewBox="0 0 24 24"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>
+        <span>View artist</span>
+      </div>
+
+      <div class="menu-item-row" onclick="openShareSheet()">
+        <svg viewBox="0 0 24 24"><path d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81 1.66 0 3-1.34 3-3s-1.34-3-3-3-3 1.34-3 3c0 .24.04.47.09.7L8.04 9.81C7.5 9.31 6.79 9 6 9c-1.66 0-3 1.34-3 3s1.34 3 3 3c.79 0 1.5-.31 2.04-.81l7.12 4.16c-.05.21-.08.43-.08.65 0 1.61 1.31 2.92 2.92 2.92s2.92-1.31 2.92-2.92c0-1.61-1.31-2.92-2.92-2.92z"/></svg>
+        <span>Share</span>
+      </div>
+
+      <div class="menu-item-row" onclick="showToast('Song credits viewed')">
+        <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/></svg>
+        <span>Song credits</span>
+      </div>
+    </div>
+
+    <!-- PROFILE MENU -->
+    <div class="bottom-sheet" id="profileSheet">
+      <div class="sheet-handle"></div>
+      
+       <div class="profile-header-divider">
+          <div class="user-avatar user-avatar-lg" onclick="showToast('Opening Profile')">Z</div>
+         <div>
+           <div class="profile-name">zshadowultra</div>
+           <div class="profile-view-link" onclick="showToast('Opening Profile')">View Profile</div>
+         </div>
+       </div>
+
+      <div class="menu-item-row" onclick="showToast('No new notifications')">
+        <svg viewBox="0 0 24 24"><path d="M12 22c1.1 0 2-.9 2-2h-4c0 1.1.89 2 2 2zm6-6v-5c0-3.07-1.64-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.63 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z"/></svg>
+        <span>What's new</span>
+      </div>
+
+      <div class="menu-item-row" onclick="showToast('Listening history loaded')">
+        <svg viewBox="0 0 24 24"><path d="M13 3c-4.97 0-9 4.03-9 9H1l3.89 3.89.07.14L9 12H6c0-3.87 3.13-7 7-7s7 3.13 7 7-3.13 7-7 7c-1.93 0-3.68-.79-4.94-2.06l-1.42 1.42C8.27 19.99 10.51 21 13 21c4.97 0 9-4.03 9-9s-4.03-9-9-9zm-1 5v5l4.28 2.54.72-1.21-3.5-2.08V8H12z"/></svg>
+        <span>Listening history</span>
+      </div>
+
+      <div class="menu-item-row" onclick="showToast('Opening Settings & Privacy')">
+        <svg viewBox="0 0 24 24"><path d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/></svg>
+        <span>Settings and privacy</span>
+      </div>
+    </div>
+
+    <!-- DEVICE MENU -->
+    <div class="bottom-sheet" id="deviceSheet">
+      <div class="sheet-handle"></div>
+      <h3 class="section-title-sheet">Connect to a device</h3>
+      
+      <div class="device-card active" onclick="showToast('Listening on This Phone')">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+          <path d="M17 1.01L7 1c-1.1 0-2 .9-2 2v18c0 1.1.9 2 2 2h10c1.1 0 2-.9 2-2V3c0-1.1-.9-1.99-2-1.99zM17 19H7V5h10v14z"/>
+        </svg>
+         <div>
+           <div class="device-title">This phone</div>
+           <div class="device-subtitle-current">Spotify Connect • Current</div>
+         </div>
+       </div>
+
+       <div class="device-card" onclick="showToast('Connecting to Living Room TV...')">
+         <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+           <path d="M21 3H3c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h5v2h8v-2h5c1.1 0 1.99-.9 1.99-2L23 5c0-1.1-.9-2-2-2zm0 14H3V5h18v12z"/>
+         </svg>
+         <div>
+           <div class="device-title">Living Room TV</div>
+           <div class="device-subtitle">Google Cast</div>
+         </div>
+       </div>
+
+       <div class="device-card" onclick="showToast('Connecting to Desktop PC...')">
+         <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+           <path d="M20 18c1.1 0 1.99-.9 1.99-2L22 6c0-1.1-.9-2-2-2H4c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2H0v2h24v-2h-4zM4 6h16v10H4V6z"/>
+         </svg>
+         <div>
+           <div class="device-title">Desktop PC</div>
+           <div class="device-subtitle">Spotify Web Player</div>
+         </div>
+       </div>
+    </div>
+
+    <!-- CREATE MENU (+) -->
+    <div class="bottom-sheet" id="createSheet">
+      <div class="sheet-handle"></div>
+      <h3 class="section-title-sheet">Create</h3>
+
+      <div class="menu-item-row" onclick="showToast('Creating Playlist...')">
+        <svg viewBox="0 0 24 24"><path d="M14 10H2v2h12v-2zm0-4H2v2h12V6zm4 8v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zM2 16h8v-2H2v2z"/></svg>
+        <div>
+          <div>Playlist</div>
+          <div class="menu-item-desc">Build a playlist with songs</div>
+        </div>
+      </div>
+
+      <div class="menu-item-row" onclick="showToast('Starting Blend with a friend...')">
+        <svg viewBox="0 0 24 24"><path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/></svg>
+        <div>
+          <div>Blend</div>
+          <div class="menu-item-desc">Combine tastes in a shared playlist</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- SORT MENU -->
+    <div class="bottom-sheet" id="sortSheet">
+      <div class="sheet-handle"></div>
+      <h3 class="section-title-sheet">Sort by</h3>
+
+      <div class="menu-item-row" onclick="selectSort('Recents')">
+        <span class="sort-label">Recents</span>
+        <span class="sort-check">✓</span>
+      </div>
+      <div class="menu-item-row" onclick="selectSort('Recently added')">
+        <span class="sort-label">Recently added</span>
+      </div>
+      <div class="menu-item-row" onclick="selectSort('Alphabetical')">
+        <span class="sort-label">Alphabetical</span>
+      </div>
+      <div class="menu-item-row" onclick="selectSort('Creator')">
+        <span class="sort-label">Creator</span>
+      </div>
+    </div>
+
+    <!-- SHARE SHEET -->
+    <div class="bottom-sheet" id="shareSheet">
+      <div class="sheet-handle"></div>
+      <h3 class="section-title-sheet-share">Share</h3>
+
+      <div class="menu-item-row" onclick="showToast('Link copied to clipboard!')">
+        <svg viewBox="0 0 24 24"><path d="M3.9 12c0-1.71 1.39-3.1 3.1-3.1h4V7H7c-2.76 0-5 2.24-5 5s2.24 5 5 5h4v-1.9H7c-1.71 0-3.1-1.39-3.1-3.1zM8 13h8v-2H8v2zm9-6h-4v1.9h4c1.71 0 3.1 1.39 3.1 3.1s-1.39 3.1-3.1 3.1h-4V17h4c2.76 0 5-2.24 5-5s-2.24-5-5-5z"/></svg>
+        <span>Copy link</span>
+      </div>
+
+      <div class="menu-item-row share-whatsapp" onclick="showToast('Opening WhatsApp...')">
+        <svg viewBox="0 0 24 24"><path d="M12.04 2C6.58 2 2.13 6.45 2.13 11.91C2.13 13.66 2.59 15.36 3.45 16.86L2.05 22L7.3 20.62C8.75 21.41 10.38 21.83 12.04 21.83C17.5 21.83 21.95 17.38 21.95 11.92C21.95 6.46 17.5 2 12.04 2Z"/></svg>
+        <span>WhatsApp</span>
+      </div>
+
+      <div class="menu-item-row" onclick="showToast('Opening Instagram Stories...')">
+        <svg viewBox="0 0 24 24"><path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z"/></svg>
+        <span>Instagram Stories</span>
+      </div>
+    </div>
+
+    <!-- GLOBAL TOAST -->
+    <div class="sp-toast" id="spToast">Action completed</div>
+
+  </div>
+
+  <!-- SCRIPT -->
+  
+<script src="bridge-mock.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

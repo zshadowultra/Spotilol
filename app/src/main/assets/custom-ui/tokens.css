@@ -1,0 +1,256 @@
+/* design tokens — single source of truth. components reference these, never raw values. */
+:root {
+      --sp-black: #121212;
+      --sp-black-deep: #000000;
+      --sp-white: #ffffff;
+      --sp-surface: #181818;
+      --sp-surface-elevated: #242424;
+      --sp-surface-highlight: #2a2a2a;
+      --sp-surface-container: #2e2e2e;
+      --sp-surface-container-low: #282828;
+      --sp-green: #1ed760;
+      --sp-green-active: #169c46;
+      --sp-text-primary: #ffffff;
+      --sp-text-secondary: #b3b3b3;
+      --sp-text-subdued: #9e9e9e;
+      --sp-text-muted: #666666;
+      --sp-text-placeholder: #757575;
+
+      /* browse category card backgrounds */
+      --sp-browse-podcasts: #d13000;
+      --sp-browse-made-for-you: #1e3264;
+      --sp-browse-charts: #d10e54;
+      --sp-browse-new-releases: #b35400;
+      --sp-browse-discover: #056952;
+      --sp-browse-live-events: #6f6f6f;
+
+      /* track accent colors (player gradient derived from artwork) */
+      --sp-accent-congaso: #3b2f4a;
+      --sp-accent-do-the-dash: #4a1919;
+      --sp-accent-discover-weekly: #1c3144;
+      --sp-accent-chill-mix: #2d1b4e;
+      --sp-accent-daily-mix-1: #18382b;
+      --sp-accent-daily-mix-6: #1f2b47;
+      --sp-accent-answers: #243a48;
+      --sp-accent-painted-feelings: #3b332b;
+      --sp-accent-echoes: #192b3a;
+      --sp-accent-test-recognise: #3b2420;
+      --sp-accent-tesla: #252538;
+      --sp-accent-testosterone: #3b1c1c;
+      --sp-accent-chest-pain: #1c2e4a;
+      --sp-accent-dark-beach: #201b38;
+      --sp-accent-joga: #3b1c1c;
+      --sp-accent-heartbeat: #3a2a16;
+      --sp-accent-run-free: #1c3144;
+      --sp-accent-myself: #1f3833;
+
+      /* other specific colors */
+      --sp-user-avatar: #8d4004;
+      --sp-liked-gradient-top: #4d1c94;
+      --sp-player-gradient-default-top: #442a5c;
+      --sp-player-gradient-default-mid: #1c1424;
+      --sp-purple-heart-1: #450af5;
+      --sp-purple-heart-2: #8e8ee5;
+      --sp-lyrics-bg: #46556e;
+      --sp-top-bar-gradient-start: rgba(18, 18, 18, 0.98);
+      --sp-top-bar-gradient-mid: rgba(18, 18, 18, 0.8);
+      --sp-bottom-nav-gradient-start: rgba(18, 18, 18, 0.96);
+      --sp-bottom-nav-gradient-end: var(--sp-black-deep);
+      --sp-device-card-bg: rgba(255, 255, 255, 0.06);
+      --sp-lyrics-teaser-bg: rgba(255, 255, 255, 0.12);
+      --sp-mini-progress-bg: rgba(255, 255, 255, 0.15);
+      --sp-slider-track-bg: rgba(255, 255, 255, 0.25);
+      --sp-fp-artwork-shadow: rgba(0, 0, 0, 0.6);
+      --sp-fp-play-shadow: rgba(0, 0, 0, 0.3);
+      --sp-bottom-sheet-shadow: rgba(0, 0, 0, 0.8);
+      --sp-modal-backdrop: rgba(0, 0, 0, 0.7);
+      --sp-sheet-handle: rgba(255, 255, 255, 0.4);
+      --sp-border-subtle: rgba(255, 255, 255, 0.05);
+      --sp-border-strong: rgba(255, 255, 255, 0.15);
+      --sp-shadow-xs: rgba(0, 0, 0, 0.3);
+      --sp-shadow-sm: rgba(0, 0, 0, 0.4);
+      --sp-shadow-md: rgba(0, 0, 0, 0.5);
+      --sp-shadow-lg: rgba(0, 0, 0, 0.6);
+      --sp-shadow-xl: rgba(0, 0, 0, 0.7);
+      --sp-shadow-xxl: rgba(0, 0, 0, 0.75);
+      --sp-shadow-bottom-sheet: rgba(0, 0, 0, 0.8);
+      --sp-text-disabled: rgba(255, 255, 255, 0.5);
+      --sp-folder-bg: #282828;
+      --sp-svg-fill-icons: var(--sp-black-deep);
+      --sp-search-icon-fill: var(--sp-black-deep);
+
+      --bottom-nav-height: 56px;
+      --mini-player-height: 56px;
+      --safe-top: env(safe-area-inset-top, 0px);
+      --safe-bottom: env(safe-area-inset-bottom, 0px);
+
+      /* spacing tokens */
+      --sp-spacing-xs: 2px;
+      --sp-spacing-sm: 4px;
+      --sp-spacing-md: 6px;
+      --sp-spacing-lg: 8px;
+      --sp-spacing-xl: 10px;
+      --sp-spacing-2xl: 12px;
+      --sp-spacing-3xl: 14px;
+      --sp-spacing-4xl: 16px;
+      --sp-spacing-5xl: 18px;
+      --sp-spacing-6xl: 20px;
+      --sp-spacing-7xl: 24px;
+
+      /* layout dimensions */
+      --sp-avatar-sm: 32px;
+      --sp-avatar-md: 40px;
+      --sp-avatar-lg: 48px;
+      --sp-thumb-sm: 40px;
+      --sp-thumb-md: 48px;
+      --sp-thumb-lg: 54px;
+      --sp-recent-card-height: 54px;
+      --sp-release-card-size: 142px;
+      --sp-browse-card-size: 94px;
+      --sp-play-circle: 52px;
+      --sp-play-large: 64px;
+      --sp-sheet-handle-w: 42px;
+      --sp-sheet-handle-h: 4px;
+      --sp-sheet-thumb: 50px;
+      --sp-badge-check: 14px;
+      --sp-scrubber-height: 3px;
+      --sp-scrubber-thumb: 10px;
+      --sp-mini-progress-h: 2px;
+      --sp-tab-icon: 22px;
+      --sp-nav-icon: 22px;
+      --sp-icon-sm: 14px;
+      --sp-icon-md: 16px;
+      --sp-icon-lg: 20px;
+      --sp-icon-xl: 22px;
+      --sp-icon-2xl: 24px;
+      --sp-icon-3xl: 28px;
+
+      /* mini-player offset */
+      --sp-mini-player-offset: 8px;
+
+      /* typography */
+      --sp-font-family: -apple-system, BlinkMacSystemFont, "Roboto", "Segoe UI", sans-serif;
+      --sp-text-xs: 10px;
+      --sp-text-sm: 11px;
+      --sp-text-base-sm: 12px;
+      --sp-text-base: 13px;
+      --sp-text-base-md: 14px;
+      --sp-text-base-lg: 15px;
+      --sp-text-md: 16px;
+      --sp-text-lg: 17px;
+      --sp-text-xl: 20px;
+      --sp-text-2xl: 21px;
+      --sp-text-3xl: 24px;
+      --sp-text-4xl: 26px;
+
+      --sp-font-weight-regular: 400;
+      --sp-font-weight-medium: 500;
+      --sp-font-weight-semibold: 600;
+      --sp-font-weight-bold: 700;
+      --sp-font-weight-extrabold: 800;
+
+      /* line-height scale */
+      --sp-leading-tight: 1;
+      --sp-leading-normal: 1.4;
+
+      /* border radius */
+      --sp-radius-xs: 2px;
+      --sp-radius-sm: 4px;
+      --sp-radius-md: 6px;
+      --sp-radius-lg: 8px;
+      --sp-radius-xl: 12px;
+      --sp-radius-2xl: 16px;
+      --sp-radius-full: 50%;
+
+      /* border width */
+      --sp-border-width-sm: 1px;
+
+      /* max app width */
+      --sp-app-max-width: 600px;
+      --sp-app-max-width-tablet: 720px;
+      --sp-app-max-width-desktop: 1020px;
+
+      /* additional spacing tokens */
+      --sp-spacing-8xl: 26px;
+      --sp-spacing-9xl: 32px;
+      --sp-spacing-10xl: 40px;
+      --sp-spacing-11xl: 44px;
+      --sp-spacing-12xl: 48px;
+      --sp-spacing-13xl: 52px;
+      --sp-spacing-14xl: 54px;
+      --sp-spacing-15xl: 56px;
+      --sp-spacing-16xl: 60px;
+      --sp-spacing-17xl: 64px;
+
+      /* additional dimensions */
+      --sp-badge-check-inner: 9px;
+      --sp-mini-player-offset: 8px;
+      --sp-scrubber-progress: 18px;
+
+      /* additional typography */
+      --sp-text-5xl: 26px;
+
+      /* additional layout */
+      --sp-play-circle-size: 52px;
+      --sp-play-large-size: 64px;
+      --sp-app-max-width-wide: 584px;
+      --sp-device-card-gap: 14px;
+
+      /* artwork sizes */
+      --sp-artwork-cover: 64px;
+      --sp-artwork-browse: 60px;
+
+      /* blur filters */
+      --sp-blur-sm: 4px;
+      --sp-blur-md: 8px;
+      --sp-blur-lg: 12px;
+      --sp-blur-xl: 16px;
+
+      /* letter spacing */
+      --sp-tracking-xs: 1px;
+
+      /* visual offsets */
+      --sp-offset-neg-sm: -4px;
+      --sp-offset-neg-md: -8px;
+
+      /* toast transform */
+      --sp-toast-translate: 20px;
+
+      /* artwork container */
+      --sp-artwork-size: 320px;
+      --sp-artwork-min-h: 120px;
+      /* fixed vertical chrome around the full-player artwork (top bar +
+         paddings + all transport margins/heights; measured 462px + buffer
+         so the teaser fits without scrolling down to 600px heights) */
+      --sp-fp-chrome: 470px;
+
+      /* chip border radius */
+      --sp-chip-radius: 20px;
+      --sp-chip-padding-y: 7px;
+      --sp-chip-min-height: 44px;
+
+      /* inline style replacements */
+      --sp-search-icon-ml: 6px;
+      --sp-folder-font: 20px;
+      --sp-lyrics-close-font: 20px;
+      --sp-device-font: 15px;
+      --sp-device-sub-font: 12px;
+      --sp-profile-name-font: 17px;
+
+      /* tap target padding (ensures >= 44px touch targets) */
+      --sp-tap-pad: 12px;
+      --sp-tap-pad-sm: 10px;
+
+      /* scrubber track + thumb (44px input stays the tap target) */
+      --sp-scrubber-track: 4px;
+      --sp-scrubber-thumb-lg: 12px;
+      --sp-scrubber-thumb-offset: -4px;
+      --sp-radius-pill: 999px;
+
+      /* stroked share icon weight */
+      --sp-icon-stroke-width: 2px;
+      --sp-icon-stroke-width-bold: 2.5px;
+
+      /* release card size at wide widths (fills the capped column) */
+      --sp-release-card-size-wide: 180px;
+    }

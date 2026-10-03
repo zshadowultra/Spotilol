@@ -241,6 +241,23 @@ class SpotifyBridge(activityRef: WeakReference<Activity>) {
 
     @Suppress("unused")
     @JavascriptInterface
+    fun loadCustomUiAsset(name: String?): String {
+        val activity = activityRef.get() ?: return ""
+        if (name.isNullOrBlank()) return ""
+        // Only allow files under custom-ui/ to prevent path traversal
+        if (name.contains("..") || name.startsWith("/")) return ""
+        return try {
+            activity.assets.open("custom-ui/$name").use { input ->
+                input.readBytes().toString(Charsets.UTF_8)
+            }
+        } catch (e: Exception) {
+            Logger.e(TAG, "loadCustomUiAsset failed for $name", e)
+            ""
+        }
+    }
+
+    @Suppress("unused")
+    @JavascriptInterface
     fun nFetch(url: String, optsJson: String?): String {
         val errorResult = { e: Exception ->
             try {
