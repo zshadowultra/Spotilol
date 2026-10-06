@@ -28,7 +28,7 @@ object LibraryAutoClose {
             var LIBRARY_SET = new Set(['your library','pustaka kamu','pustakamu','tu biblioteca','la tua libreria','deine mediathek','ваша библиотека','twoja biblioteka','sua biblioteca','votre bibliothèque','ta bibliothèque','jouw bibliotheek','ditt bibliotek','kitaplığın','ライブラリ','라이브러리']);
             var CLOSE_SEL = '[data-testid="PanelHeader_CloseButton"]';
             var HIDDEN_SEL = '[aria-hidden="true"]';
-            var IGNORE_SEL = 'button[data-testid="library-button"], [role="menu"], [role="dialog"], [data-tippy-root]';
+            var IGNORE_SEL = '[aria-label="Your Library"], [role="menu"], [role="dialog"], [data-tippy-root]';
             var SIDEBAR_SEL = '#Desktop_LeftSidebar_Id';
             var SKIP_SEL = HIDDEN_SEL + ', ' + SIDEBAR_SEL;
 

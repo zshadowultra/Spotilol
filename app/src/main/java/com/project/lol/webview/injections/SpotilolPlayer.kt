@@ -29,7 +29,7 @@ object SpotilolPlayer {
                 npb.style.display='none';
 
                 function splFindShuffle(){
-                    return (typeof window.splShuffleBtn === 'function') ? window.splShuffleBtn() : document.querySelector('button[data-testid="control-button-shuffle"]');
+                    return (typeof window.splShuffleBtn === 'function') ? window.splShuffleBtn() : document.querySelector('button[aria-label="Enable shuffle"], button[aria-label="Disable shuffle"]');
                 }
                 function splFindRepeat(){
                     return (typeof window.splRepeatBtn === 'function') ? window.splRepeatBtn() : document.querySelector('button[data-testid="control-button-repeat"]');

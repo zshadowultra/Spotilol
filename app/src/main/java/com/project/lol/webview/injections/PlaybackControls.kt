@@ -157,7 +157,7 @@ object PlaybackControls {
                 if(fb) { AndBridge.wakeUp(); fb.click(); }
             };
             window.splShuffleBtn = function() {
-                var b = document.querySelector('button[data-testid="control-button-shuffle"]');
+                var b = document.querySelector('button[aria-label="Enable shuffle"], button[aria-label="Disable shuffle"]');
                 if(b) return b;
                 var sk = document.querySelector('button[data-testid="control-button-skip-back"]');
                 if(sk) {
