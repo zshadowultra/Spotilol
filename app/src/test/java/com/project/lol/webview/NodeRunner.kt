@@ -115,8 +115,26 @@ object NodeRunner {
         if (Regex("^__PAINT__$", RegexOption.MULTILINE).containsMatchIn(body)) sub("__PAINT__", paintFn)
         if (Regex("^__CUSTOMUI_FNS__$", RegexOption.MULTILINE).containsMatchIn(body)) sub("__CUSTOMUI_FNS__", cuiFns)
         if (Regex("^__APPSKELETON__$", RegexOption.MULTILINE).containsMatchIn(body)) sub("__APPSKELETON__", appSkel)
-        body = body.replace("__SKELCSS__", skelCss.replace("\\", "\\\\").replace("$", "\\$"))
+        body = body.replace("__SKELCSS__", jsQuote(skelCss))
         return File(nodeDir, "prelude.js").readText() + "\n" + body
+    }
+
+    /** Minimal JSON.stringify(s) equivalent: a double-quoted JS string literal. */
+    private fun jsQuote(s: String): String {
+        val sb = StringBuilder(s.length + 2)
+        sb.append('"')
+        for (c in s) {
+            when (c) {
+                '\\' -> sb.append("\\\\")
+                '"' -> sb.append("\\\"")
+                '\n' -> sb.append("\\n")
+                '\r' -> sb.append("\\r")
+                '\t' -> sb.append("\\t")
+                else -> if (c < ' ') sb.append("\\u%04x".format(c.code)) else sb.append(c)
+            }
+        }
+        sb.append('"')
+        return sb.toString()
     }
 
     /** Assembles and runs a driver; returns stdout. Throws on failure. */
