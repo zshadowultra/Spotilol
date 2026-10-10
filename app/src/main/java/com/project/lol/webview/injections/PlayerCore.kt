@@ -28,6 +28,25 @@ object PlayerCore {
                     try{window.__splFloaters[i]();}catch(e){}
                 }
             },250);
+            // C1: consolidated 5s warden. Parts register named check functions via
+            // window.__splWardenAdd(name, fn) instead of owning their own setInterval
+            // (same registry shape as __splFloaters above). The single timer skips
+            // entirely when window.__splBg is true, so every registered check is
+            // background-guarded by construction. Registration overwrites by name and
+            // the timer is created once, so re-injection is idempotent.
+            window.__splWardenReg = window.__splWardenReg || {};
+            window.__splWardenAdd = function(name, fn){ window.__splWardenReg[name] = fn; };
+            if(!window.__splWarden){
+                window.__splWarden = setInterval(function(){
+                    if(window.__splBg) return;
+                    var reg = window.__splWardenReg;
+                    for(var name in reg){
+                        if(Object.prototype.hasOwnProperty.call(reg, name)){
+                            try{ reg[name](); }catch(e){}
+                        }
+                    }
+                },5000);
+            }
             if(typeof window.__splPbVal==='undefined') window.__splPbVal=null;
             window.splPbNode=function(){
                 var n=document.querySelector('aside button[data-testid=control-button-playpause]');

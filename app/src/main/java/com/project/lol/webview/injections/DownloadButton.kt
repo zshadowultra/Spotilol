@@ -33,7 +33,39 @@ object DownloadButton {
                 anchorBtn.before(btn);
                 window.dlBtn = btn;
             };
-            setInterval(splAddDownloadBtn, 5000);
+            // C1: the 5s scan moves into window.__splWarden (PlayerCore.kt) as a named
+            // check; the warden skips when window.__splBg is true (the old interval
+            // had no bg guard). splAddDownloadBtn() is idempotent (no-ops once
+            // window.dlBtn is set), so warden re-runs are free.
+            if(window.__splWardenAdd) window.__splWardenAdd('splDlBtn', window.splAddDownloadBtn);
+            else setInterval(window.splAddDownloadBtn, 5000);
+            // C5: event-driven — the anchor buttons (lyrics/queue) live in the
+            // now-playing bar (not div[data-testid="action-bar-row"], which is the
+            // playlist-header bar). Re-run the idempotent scan when such buttons
+            // are added, instead of waiting for the next poll. The warden check
+            // above remains as fallback for anything the observer misses.
+            if(!window.__splDlBtnObs && window.MutationObserver){
+                window.__splDlBtnObs = new MutationObserver(function(muts){
+                    if(window.__splBg) return;
+                    if(typeof window.dlBtn !== 'undefined') return;
+                    for(var i=0;i<muts.length;i++){
+                        var nodes=muts[i].addedNodes;
+                        for(var j=0;j<nodes.length;j++){
+                            var n=nodes[j];
+                            if(!n||n.nodeType!==1) continue;
+                            if((n.matches && n.matches('button[data-testid=lyrics-button],button[data-testid=control-button-queue]')) ||
+                               (n.querySelector && n.querySelector('button[data-testid=lyrics-button],button[data-testid=control-button-queue]'))){
+                                try{ window.splAddDownloadBtn(); }catch(e){}
+                                return;
+                            }
+                        }
+                    }
+                });
+                try{
+                    var dlTarget = document.querySelector('aside[data-testid="now-playing-bar"]') || document.body || document.documentElement;
+                    window.__splDlBtnObs.observe(dlTarget, { childList: true, subtree: true });
+                }catch(e){}
+            }
         
     """
 }

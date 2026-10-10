@@ -3,8 +3,12 @@ package com.project.lol.webview.injections
 object MainLoop {
     const val CONTENT = """
             window.firstFuck = function(){
-                if(pfint) clearInterval(pfint);
-                pfint = setInterval(function(){
+                // C1: pfint consolidated into window.__splWarden (PlayerCore.kt).
+                // The warden ticks every 5s and skips when window.__splBg is true,
+                // so this check no longer needs its own interval (and gains the bg
+                // guard pfint never had). Registration overwrites by name, so
+                // re-running firstFuck() is idempotent — no interval leak.
+                function splPfCheck(){
                     if(playing && document.visibilityState=='hidden' && !!document.querySelector('.VideoPlayer__container video')) {
                         AndBridge.wakeUp();
                     } else if(!AndBridge.isWoke() && document.visibilityState=='visible' && !document.querySelector('.VideoPlayer__container video')) {
@@ -33,8 +37,15 @@ object MainLoop {
 
                     var pb = document.querySelector('aside button[data-testid=control-button-playpause]:not(.fuckd)');
                     if(pb) wirePlayBtn(pb);
-                },5000);
+                }
+                if(window.__splWardenAdd) window.__splWardenAdd('splPf', splPfCheck);
+                else { if(pfint) clearInterval(pfint); pfint = setInterval(splPfCheck, 5000); }
 
+                // B5: bootIv is a one-shot boot loop, not a poller — it wires the
+                // play button fast at startup and self-terminates after 100 tries
+                // (30s). No DOM/event signal can replace "page just loaded, wait
+                // for the player to mount". Frozen by the native onPause()/
+                // pauseTimers() path (B1) if the app backgrounds mid-boot.
                 var tries = 0;
                 var bootIv = setInterval(function(){
                     tries++;
@@ -63,6 +74,10 @@ object MainLoop {
                             if(ulFlag && window.splIsPlaying()===false) {
                                 AndBridge.deferMessage('unlock');
                                 actSkipForward();
+                                // B5: uIv is a one-shot unlock confirmation poll (<=6 tries,
+                                // self-clearing), not a standing interval. No event signal
+                                // exists for "unlock round-trip completed"; frozen by the
+                                // native onPause()/pauseTimers() path (B1) if backgrounded.
                                 var uTries=0;
                                 var uIv=setInterval(function(){
                                     uTries++;

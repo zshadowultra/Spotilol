@@ -40,11 +40,18 @@ object AndroidTracker {
                         clearTimeout(readTimeout);
                         readTimeout = setTimeout(readTrackState, 200);
                     });
-                    obs.observe(npTarget, { childList: true, subtree: true, attributes: true, characterData: true });
+                    // C2: only the attributes readTrackState() reads — React class
+                    // toggles and other attribute churn in the now-playing bar no
+                    // longer wake the (200ms-debounced) read.
+                    obs.observe(npTarget, { childList: true, subtree: true, attributes: true, characterData: true,
+                        attributeFilter: ['aria-checked','aria-label','href','src'] });
                     aaint = obs;
                     readTrackState();
                 } catch(e) {
-                    aaint = setInterval(readTrackState, 1000);
+                    // B5: last-resort poll if MutationObserver construction throws;
+                    // bg-guarded like every other interval, and frozen by the native
+                    // onPause()/pauseTimers() path (B1).
+                    aaint = setInterval(function(){ if(!window.__splBg) readTrackState(); }, 1000);
                 }
             };
         

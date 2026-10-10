@@ -549,6 +549,14 @@ object PlaylistSort {
             // Event-driven decorate (replaces 1s setInterval): observe for columnheader
             // changes, keep 5s fallback warden for anything the observer misses.
             // injectStyle() already early-returns if the style element exists.
+            // C5: why the 5s fallback poll remains — headerObserver covers DOM
+            // signals (columnheader added / role, aria-sort, data-spl-sort
+            // changed), but decorate() also depends on non-DOM state: sort
+            // changes applied programmatically via window.splPlaylistSort.set()
+            // fire no mutation, and a React reconciliation that reuses header
+            // nodes without touching an observed attribute is invisible to the
+            // observer. The fallback is bg-guarded, so it never wakes
+            // backgrounded JS.
             var headerObserver = null;
             var headerDebounce = null;
             function scheduleDecorate(){

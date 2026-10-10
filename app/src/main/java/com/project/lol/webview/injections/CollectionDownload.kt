@@ -109,6 +109,11 @@ object CollectionDownload {
                     if (sc) { try { sc.scrollTop = top; } catch(e){} }
                     setTimeout(function(){ cb(out); }, 300);
                 };
+                // B5: one-shot tracklist scroller, not a standing interval — it runs
+                // only during an active collection download and always terminates
+                // via finish() (clearInterval). No event signal exists for "all
+                // virtualized rows have rendered"; frozen by the native onPause()/
+                // pauseTimers() path (B1) if the app backgrounds mid-download.
                 var iv = setInterval(function(){
                     iter++;
                     scrapeInto(albumFallback, tl, seen, out);
@@ -305,7 +310,14 @@ object CollectionDownload {
                 ensureButtons();
                 syncButtons();
             }
-            setInterval(tick, 2000);
+            // C1: the 2s tick moves into window.__splWarden at 5s. hijack() is
+            // already event-driven (MutationObserver above, 150ms debounce); the
+            // warden covers ensureButtons()/syncButtons(), for which no DOM signal
+            // exists — they react to JS bridge flags (window.__splDlActive /
+            // __splDlBatch) and SPA route changes that fire no observable mutation
+            // on the action bar. The warden skips when window.__splBg is true.
+            if(window.__splWardenAdd) window.__splWardenAdd('splColDl', tick);
+            else setInterval(tick, 2000);
             tick();
         })();
     """

@@ -52,6 +52,18 @@ object SearchOverlay {
 
                 function iconFor(kind){ return ICONS[kind] || ICONS.search; }
 
+                function splArtInto(im, url){
+                    if(window.__splUx){ window.__splUx.artCache.loadInto(im, url); }
+                    else { im.setAttribute('loading','lazy'); im.setAttribute('decoding','async'); im.src=url; }
+                }
+                function splDwell(el, uri){
+                    if(!el || !uri || !window.__splUx) return;
+                    el.addEventListener('mouseenter', function(){ window.__splUx.prefetch.arm(uri); });
+                    el.addEventListener('mouseleave', function(){ window.__splUx.prefetch.disarm(uri); });
+                    el.addEventListener('focus', function(){ window.__splUx.prefetch.arm(uri); });
+                    el.addEventListener('blur', function(){ window.__splUx.prefetch.disarm(uri); });
+                }
+
                 function pickImg(sources){
                     if(!sources || !sources.length) return '';
                     var best = null;
@@ -327,14 +339,14 @@ object SearchOverlay {
                         el.setAttribute('data-kind','artist');
                         el.setAttribute('data-uri',d.uri || '');
                         var av = pickImg(d.visuals && d.visuals.avatarImage && d.visuals.avatarImage.sources);
-                        if(av){ var im=document.createElement('img'); im.src=av; icon.appendChild(im); } else { icon.innerHTML = iconFor('artist'); }
+                        if(av){ var im=document.createElement('img'); splArtInto(im,av); icon.appendChild(im); } else { icon.innerHTML = iconFor('artist'); }
                         name.appendChild(linkTo('/artist/' + (d.uri||'').replace('spotify:artist:',''), (d.profile && d.profile.name) || ''));
                         sub.textContent = 'Artist';
                     } else if(t === 'TrackResponseWrapper'){
                         el.setAttribute('data-kind','track');
                         el.setAttribute('data-uri',d.uri || '');
                         var cv = pickImg(d.albumOfTrack && d.albumOfTrack.coverArt && d.albumOfTrack.coverArt.sources);
-                        if(cv){ var im2=document.createElement('img'); im2.src=cv; icon.appendChild(im2); } else { icon.innerHTML = iconFor('track'); }
+                        if(cv){ var im2=document.createElement('img'); splArtInto(im2,cv); icon.appendChild(im2); } else { icon.innerHTML = iconFor('track'); }
                         name.appendChild(linkTo('/track/' + (d.uri||'').replace('spotify:track:',''), d.name || ''));
                         var isExplicit = !!(d.contentRating && d.contentRating.label === 'EXPLICIT');
                         if(isExplicit){
@@ -354,7 +366,7 @@ object SearchOverlay {
                         el.setAttribute('data-kind','album');
                         el.setAttribute('data-uri',d.uri || '');
                         var cv2 = pickImg(d.coverArt && d.coverArt.sources);
-                        if(cv2){ var im3=document.createElement('img'); im3.src=cv2; icon.appendChild(im3); } else { icon.innerHTML = iconFor('album'); }
+                        if(cv2){ var im3=document.createElement('img'); splArtInto(im3,cv2); icon.appendChild(im3); } else { icon.innerHTML = iconFor('album'); }
                         name.appendChild(linkTo('/album/' + (d.uri||'').replace('spotify:album:',''), d.name || ''));
                         var arts2 = d.artists && d.artists.items || [];
                         if(arts2.length){ sub.appendChild(artistLinks(arts2, ', ')); sub.appendChild(document.createTextNode(' · Album')); }
@@ -363,7 +375,7 @@ object SearchOverlay {
                         el.setAttribute('data-kind','playlist');
                         el.setAttribute('data-uri',d.uri || '');
                         var cv3 = pickImg(d.images && d.images.items && d.images.items[0] && d.images.items[0].sources) || pickImg(d.visualIdentity && d.visualIdentity.squareCoverImage && d.visualIdentity.squareCoverImage.sources) || pickImg(d.images && d.images.sources) || pickImg(d.visuals && d.visuals.image && d.visuals.image.sources);
-                        if(cv3){ var im4=document.createElement('img'); im4.src=cv3; icon.appendChild(im4); } else { icon.innerHTML = iconFor('playlist'); }
+                        if(cv3){ var im4=document.createElement('img'); splArtInto(im4,cv3); icon.appendChild(im4); } else { icon.innerHTML = iconFor('playlist'); }
                         name.appendChild(linkTo('/playlist/' + (d.uri||'').replace('spotify:playlist:',''), d.name || ''));
                         var owner = d.ownerV2 && d.ownerV2.data;
                         if(owner && owner.name){
@@ -376,7 +388,7 @@ object SearchOverlay {
                         el.setAttribute('data-kind','episode');
                         el.setAttribute('data-uri',d.uri || '');
                         var cv4 = pickImg(d.coverArt && d.coverArt.sources) || pickImg(d.images && d.images.sources);
-                        if(cv4){ var im5=document.createElement('img'); im5.src=cv4; icon.appendChild(im5); } else { icon.innerHTML = iconFor('podcast'); }
+                        if(cv4){ var im5=document.createElement('img'); splArtInto(im5,cv4); icon.appendChild(im5); } else { icon.innerHTML = iconFor('podcast'); }
                         name.appendChild(linkTo('/episode/' + (d.uri||'').replace(/^spotify:episode:/,''), d.name || ''));
                         var showL = showLinkFor(d, d.podcastV2 || d.show);
                         if(showL){ sub.appendChild(document.createTextNode('Episode · ')); sub.appendChild(showL); }
@@ -385,7 +397,7 @@ object SearchOverlay {
                         el.setAttribute('data-kind','show');
                         el.setAttribute('data-uri',d.uri || '');
                         var cv5 = pickImg(d.coverArt && d.coverArt.sources) || pickImg(d.images && d.images.sources);
-                        if(cv5){ var im6=document.createElement('img'); im6.src=cv5; icon.appendChild(im6); } else { icon.innerHTML = iconFor('podcast'); }
+                        if(cv5){ var im6=document.createElement('img'); splArtInto(im6,cv5); icon.appendChild(im6); } else { icon.innerHTML = iconFor('podcast'); }
                         name.appendChild(linkTo('/show/' + (d.uri||'').replace('spotify:show:',''), d.name || ''));
                         sub.textContent = 'Podcast';
                     } else {
@@ -419,6 +431,8 @@ object SearchOverlay {
                         el.appendChild(favBtnFor(uri));
                     }
                     el.addEventListener('mousedown', function(e){ e.preventDefault(); });
+                    var dk = el.getAttribute('data-kind');
+                    if(dk==='artist'||dk==='album'||dk==='playlist'||dk==='show'){ splDwell(el, el.getAttribute('data-uri')); }
                     return el;
                 }
 
@@ -537,7 +551,9 @@ object SearchOverlay {
                     if(v === lastQ) return;
                     lastQ = v;
                     clearTimeout(debTimer);
-                    debTimer = setTimeout(function(){ doSearch(v); }, 220);
+                    // C8: debounce search-as-you-type 250ms after the last keystroke
+                    // before hitting the Spotify API (was 220ms).
+                    debTimer = setTimeout(function(){ doSearch(v); }, 250);
                 }
 
                 function buildPanel(){
@@ -617,7 +633,7 @@ object SearchOverlay {
                             var t = e.target;
                             if(!(t === panel || (panel.contains && panel.contains(t)))) hidePanel();
                         }
-                    }, true);
+                    }, {capture:true, passive:true});
                 }
 
                 function bindSearchIcon(){
@@ -662,11 +678,18 @@ object SearchOverlay {
                 }
                 watchBody();
                 if(!navBar) document.addEventListener('DOMContentLoaded', watchBody, { once: true });
-                var int = setInterval(function(){
-                    if(window.__splBg) return;
+                // C1+C5: the 2s bindSearchIcon poll is replaced by the nav-bar
+                // MutationObserver above (event-driven rebind when the nav bar
+                // remounts) plus a 5s window.__splWarden fallback for anything the
+                // observer misses (e.g. the icon swapped without a childList
+                // mutation on navBar, or navBar detached before watchBody ran).
+                // The warden skips when window.__splBg is true.
+                function splSearchWarden(){
                     if(navBar && !navBar.isConnected) startMo();
                     bindSearchIcon();
-                }, 2000);
+                }
+                if(window.__splWardenAdd) window.__splWardenAdd('splSearch', splSearchWarden);
+                else setInterval(function(){ if(window.__splBg) return; splSearchWarden(); }, 2000);
             })();
         
     """

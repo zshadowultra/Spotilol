@@ -108,4 +108,7 @@ dependencies {
 
     // Core library desugaring (required by NewPipeExtractor)
     coreLibraryDesugaring(libs.desugaring)
+
+    // Unit tests (webview injection CONTENT assertions)
+    testImplementation(libs.junit4)
 }
