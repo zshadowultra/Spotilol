@@ -4,6 +4,7 @@ import android.annotation.SuppressLint
 import android.app.PendingIntent
 import android.app.PictureInPictureParams
 import android.app.RemoteAction
+import android.content.Context
 import android.content.Intent
 import android.content.SharedPreferences
 import android.content.pm.ActivityInfo
@@ -118,6 +119,7 @@ import com.project.lol.util.Logger
 import com.project.lol.util.UpdateChecker
 import com.project.lol.webview.SpotifyWebChromeClient
 import com.project.lol.webview.SpotifyWebViewClient
+import com.project.lol.webview.TrimMemoryPolicy
 import com.project.lol.webview.helpers.DevLogPrelude
 import com.project.lol.webview.helpers.LyricsTheme
 import com.project.lol.webview.helpers.buildAmoledJs
@@ -183,6 +185,25 @@ class MainActivity : ComponentActivity() {
     private lateinit var prefs: SharedPreferences
 
     private var changelogOnUpdate = false
+
+    /** The composed SpotifyBridge, kept so WebView (re)creation outside
+     *  composition (B4 renderer recovery) can re-attach the same wired bridge. */
+    private var spotifyBridge: SpotifyBridge? = null
+
+    /** One-shot set by B4 recovery; consumed by handlePlayerInjected. */
+    private var pendingRendererRestorePlaying = false
+
+    /** B1 — symmetric native pause/resume, wired to the real WebView + global timers. */
+    private val pauseCoordinator = WebViewPauseCoordinator(
+        instanceOps = object : WebViewPauseCoordinator.InstanceOps {
+            override fun pause() { webView?.onPause() }
+            override fun resume() { webView?.onResume() }
+        },
+        globalOps = object : WebViewPauseCoordinator.GlobalOps {
+            override fun pauseTimers() = WebView.pauseTimers()
+            override fun resumeTimers() = WebView.resumeTimers()
+        }
+    )
 
 
     @SuppressLint("SetJavaScriptEnabled")
@@ -409,6 +430,7 @@ class MainActivity : ComponentActivity() {
                             val bridge = remember {
                                 SpotifyBridge(WeakReference(this@MainActivity))
                             }
+                            spotifyBridge = bridge
 
                             bridge.onTimerDialogRequest = {
                                 showSleepTimerDialog.value = true
@@ -443,101 +465,11 @@ class MainActivity : ComponentActivity() {
 
                             AndroidView(
                                 factory = { context ->
-                                    WebView(context).apply {
-                                        layoutParams = ViewGroup.LayoutParams(
-                                            ViewGroup.LayoutParams.MATCH_PARENT,
-                                            ViewGroup.LayoutParams.MATCH_PARENT
-                                        )
-
-                                        webView = this
-
-                                        setLayerType(View.LAYER_TYPE_HARDWARE, null)
-
-                                        settings.apply {
-                                            userAgentString = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/150.0.0.0 Safari/537.36"
-                                            javaScriptEnabled = true
-                                            domStorageEnabled = true
-                                            useWideViewPort = true
-                                            loadWithOverviewMode = true
-                                            setSupportZoom(true)
-                                            builtInZoomControls = true
-                                            displayZoomControls = false
-                                            allowFileAccess = false
-                                            allowContentAccess = false
-                                            mediaPlaybackRequiresUserGesture = false
-                                            setSupportMultipleWindows(true)
-                                            javaScriptCanOpenWindowsAutomatically = true
-                                            cacheMode = android.webkit.WebSettings.LOAD_DEFAULT
-                                            setGeolocationEnabled(false)
-                                            @Suppress("DEPRECATION")
-                                            saveFormData = false
-                                            mixedContentMode = android.webkit.WebSettings.MIXED_CONTENT_NEVER_ALLOW
-                                        }
-
-                                        setInitialScale(100)
-                                        setBackgroundColor(0xFF000000.toInt())
-
-                                        if (WebViewFeature.isFeatureSupported(WebViewFeature.BACK_FORWARD_CACHE)) {
-                                            WebSettingsCompat.setBackForwardCacheEnabled(settings, true)
-                                        }
-
-                                        addJavascriptInterface(bridge, "AndBridge")
-                                        webChromeClient = SpotifyWebChromeClient(
-                                            onProgressChanged = { progress ->
-                                                loadingProgress.intValue = progress
-                                            },
-                                            onShowCustomView = { view, callback ->
-                                                handleCustomViewShown(view, callback)
-                                            },
-                                            onHideCustomView = {
-                                                handleCustomViewHidden()
-                                            }
-                                        )
-
-                                        val spotifyClient = SpotifyWebViewClient(
-                                            onLoginRequired = {
-                                                loadUrl("https://accounts.spotify.com/login")
-                                            },
-                                            onRenderProcessGone = {
-                                                runOnUiThread {
-                                                    webViewError.value = null
-                                                    destroyWebView()
-                                                }
-                                            },
-                                            onWebViewError = { code, desc ->
-                                                webViewError.value = code to desc
-                                            }
-                                        )
-                                        webViewClient = spotifyClient
-                                        // Before the first loadUrl, so it applies to the first page.
-                                        spotifyClient.installDocumentStartScripts(this)
-
-                                        val executor = Executors.newSingleThreadExecutor()
-                                        if (useProxy && LocalProxyManager.isRunning) {
-                                            val proxyConfig = ProxyConfig.Builder()
-                                                .addProxyRule("localhost:${LocalProxyManager.port}")
-                                                .build()
-                                            ProxyController.getInstance().setProxyOverride(
-                                                proxyConfig,
-                                                executor,
-                                                { }
-                                            )
-                                        } else {
-                                            ProxyController.getInstance().clearProxyOverride(executor, { })
-                                        }
-
-                                        val target = pendingLink
-                                            ?: if (loggedIn) "https://open.spotify.com/"
-                                            else "https://accounts.spotify.com/login"
-                                        pendingLink = null
-                                        Logger.i(
-                                            TAG,
-                                            "webview ready: js=on dom=on multiWindow=on bfcache=" +
-                                                WebViewFeature.isFeatureSupported(WebViewFeature.BACK_FORWARD_CACHE) +
-                                                " proxy=$useProxy target=$target"
-                                        )
-                                        loadUrl(target)
-                                    }
+                                    val target = pendingLink
+                                        ?: if (loggedIn) "https://open.spotify.com/"
+                                        else "https://accounts.spotify.com/login"
+                                    pendingLink = null
+                                    createPlayerWebView(context, target)
                                 },
                                 modifier = Modifier
                                     .fillMaxSize()
@@ -717,22 +649,59 @@ class MainActivity : ComponentActivity() {
         Toast.makeText(this, getString(R.string.main_profile_deleted), Toast.LENGTH_SHORT).show()
     }
 
+    /**
+     * A2 — transient WebView #1: "clear cache" settings action.
+     * clearCache()/clearHistory() act on the SHARED Chromium cache, not on the
+     * instance, so the live main WebView is preferred when present — no second
+     * renderer is ever spawned (peak live WebViews stays 1). The throwaway
+     * instance is only a fallback when the main WebView is gone, and is
+     * destroy()ed on all paths via useTransientWebView.
+     */
     private fun clearWebViewCache() {
         Logger.i(TAG, "clearing webview cache and history")
-        val wv = WebView(applicationContext)
-        wv.clearCache(true)
-        wv.clearHistory()
-        wv.destroy()
+        val main = webView
+        if (main != null) {
+            main.clearCache(true)
+            main.clearHistory()
+        } else {
+            val res = useTransientWebView(
+                create = { RealTransientWebView(WebView(applicationContext)) }
+            ) {
+                it.clearCache(true)
+                it.clearHistory()
+            }
+            if (res.overBudget) {
+                Logger.w(TAG, "webview budget exceeded: >1 WebView alive during clearWebViewCache")
+            }
+        }
         Toast.makeText(this, getString(R.string.main_cache_cleared), Toast.LENGTH_SHORT).show()
     }
 
+    /**
+     * A2 — transient WebView #2: "clear all data" settings action.
+     * Same pattern as clearWebViewCache: prefer the live main WebView (cache /
+     * history / form data are all shared-Chromium state); fall back to a
+     * throwaway instance with guaranteed destroy().
+     */
     private fun clearAllData() {
         Logger.w(TAG, "clearing all data (cache, storage, cookies, login state)")
-        val wv = WebView(applicationContext)
-        wv.clearCache(true)
-        wv.clearHistory()
-        wv.clearFormData()
-        wv.destroy()
+        val main = webView
+        if (main != null) {
+            main.clearCache(true)
+            main.clearHistory()
+            main.clearFormData()
+        } else {
+            val res = useTransientWebView(
+                create = { RealTransientWebView(WebView(applicationContext)) }
+            ) {
+                it.clearCache(true)
+                it.clearHistory()
+                it.clearFormData()
+            }
+            if (res.overBudget) {
+                Logger.w(TAG, "webview budget exceeded: >1 WebView alive during clearAllData")
+            }
+        }
         WebStorage.getInstance().deleteAllData()
         CookieManager.getInstance().removeAllCookies(null)
         CookieManager.getInstance().flush()
@@ -1303,28 +1272,220 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    /**
+     * Builds the player WebView with the full canonical configuration
+     * (settings, bridge, clients, proxy, document-start scripts, first load).
+     * Used both for the initial Compose factory AND for B4 renderer-crash
+     * recovery, so a rebuilt WebView always gets identical settings.
+     */
+    private fun createPlayerWebView(context: Context, initialUrl: String): WebView {
+        val bridge = spotifyBridge ?: SpotifyBridge(WeakReference(this)).also { spotifyBridge = it }
+        val useProxy = prefs.getString("ConnectionMode", "normal") == "proxy"
+        return WebView(context).apply {
+            layoutParams = ViewGroup.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.MATCH_PARENT
+            )
+
+            webView = this
+            // A2: budget accounting — warn if a second WebView is ever alive.
+            if (WebViewBudget.noteCreated("main")) {
+                Logger.w(TAG, "webview budget exceeded: >1 WebView alive simultaneously")
+            }
+
+            setLayerType(View.LAYER_TYPE_HARDWARE, null)
+
+            settings.apply {
+                userAgentString = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/150.0.0.0 Safari/537.36"
+                javaScriptEnabled = true
+                domStorageEnabled = true
+                useWideViewPort = true
+                loadWithOverviewMode = true
+                setSupportZoom(true)
+                builtInZoomControls = true
+                displayZoomControls = false
+                allowFileAccess = false
+                allowContentAccess = false
+                mediaPlaybackRequiresUserGesture = false
+                setSupportMultipleWindows(true)
+                javaScriptCanOpenWindowsAutomatically = true
+                cacheMode = android.webkit.WebSettings.LOAD_DEFAULT
+                setGeolocationEnabled(false)
+                @Suppress("DEPRECATION")
+                saveFormData = false
+                mixedContentMode = android.webkit.WebSettings.MIXED_CONTENT_NEVER_ALLOW
+                // A3: offscreen pre-raster for long lists (GPU memory for scroll
+                // smoothness). Pref-gated (WebViewTuning/offscreen_pre_raster,
+                // default ON) so it can be A/B'd; applies on WebView
+                // (re)creation. Guarded at Q (conservative; docs carry no
+                // lower-bound note).
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                    val preRaster = this@MainActivity.getSharedPreferences("WebViewTuning", Context.MODE_PRIVATE)
+                        .getBoolean("offscreen_pre_raster", true)
+                    try {
+                        setOffscreenPreRaster(preRaster)
+                    } catch (_: Exception) {
+                    }
+                    Logger.d(TAG, "offscreenPreRaster=$preRaster")
+                }
+            }
+
+            setInitialScale(100)
+            setBackgroundColor(0xFF000000.toInt())
+
+            if (WebViewFeature.isFeatureSupported(WebViewFeature.BACK_FORWARD_CACHE)) {
+                WebSettingsCompat.setBackForwardCacheEnabled(settings, true)
+            }
+
+            addJavascriptInterface(bridge, "AndBridge")
+            webChromeClient = SpotifyWebChromeClient(
+                onProgressChanged = { progress ->
+                    loadingProgress.intValue = progress
+                },
+                onShowCustomView = { view, callback ->
+                    handleCustomViewShown(view, callback)
+                },
+                onHideCustomView = {
+                    handleCustomViewHidden()
+                }
+            )
+
+            val spotifyClient = SpotifyWebViewClient(
+                onLoginRequired = {
+                    loadUrl("https://accounts.spotify.com/login")
+                },
+                onRenderProcessGone = { deadView ->
+                    runOnUiThread { handleRendererGone(deadView) }
+                },
+                onPlayerInjected = {
+                    handlePlayerInjected()
+                },
+                onWebViewError = { code, desc ->
+                    webViewError.value = code to desc
+                }
+            )
+            webViewClient = spotifyClient
+            // Before the first loadUrl, so it applies to the first page.
+            spotifyClient.installDocumentStartScripts(this)
+
+            val executor = Executors.newSingleThreadExecutor()
+            if (useProxy && LocalProxyManager.isRunning) {
+                val proxyConfig = ProxyConfig.Builder()
+                    .addProxyRule("localhost:${LocalProxyManager.port}")
+                    .build()
+                ProxyController.getInstance().setProxyOverride(
+                    proxyConfig,
+                    executor,
+                    { }
+                )
+            } else {
+                ProxyController.getInstance().clearProxyOverride(executor, { })
+            }
+
+            Logger.i(
+                TAG,
+                "webview ready: js=on dom=on multiWindow=on bfcache=" +
+                    WebViewFeature.isFeatureSupported(WebViewFeature.BACK_FORWARD_CACHE) +
+                    " proxy=$useProxy target=$initialUrl"
+            )
+            loadUrl(initialUrl)
+        }
+    }
+
     private fun destroyWebView() {
         Logger.i(TAG, "destroying webview")
         pipVideoView = null
         pipVideoCallback = null
         pipVideoActive.value = false
         hidePipOverlay()
-        webView?.let {
-            it.stopLoading()
-            it.removeJavascriptInterface("AndBridge")
-            if (WebViewFeature.isFeatureSupported(WebViewFeature.WEB_VIEW_RENDERER_TERMINATE)) {
-                try {
-                    WebViewCompat.getWebViewRenderProcess(it)?.terminate()
-                } catch (_: Exception) {}
-            }
-            // Must detach from its parent before destroy()
-            // Otherwise the WebView and its renderer will be left in a bad state;
-            (it.parent as? ViewGroup)?.removeView(it)
-            it.removeAllViews()
-            it.destroy()
-        }
+        webView?.let { teardownWebView(it) }
         webView = null
         MediaNotificationService.webView = null
+    }
+
+    /** A2/B4 — single teardown path: stop, drop the bridge, detach from the
+     *  parent (required before destroy(), else the renderer is left in a bad
+     *  state), destroy, and update the WebView budget. */
+    private fun teardownWebView(wv: WebView) {
+        wv.stopLoading()
+        wv.removeJavascriptInterface("AndBridge")
+        if (WebViewFeature.isFeatureSupported(WebViewFeature.WEB_VIEW_RENDERER_TERMINATE)) {
+            try {
+                WebViewCompat.getWebViewRenderProcess(wv)?.terminate()
+            } catch (_: Exception) {}
+        }
+        // Must detach from its parent before destroy()
+        // Otherwise the WebView and its renderer will be left in a bad state;
+        (wv.parent as? ViewGroup)?.removeView(wv)
+        wv.removeAllViews()
+        wv.destroy()
+        WebViewBudget.noteDestroyed()
+    }
+
+    /**
+     * B4 — renderer-crash recovery, driven by RendererRecoveryCoordinator.
+     *
+     * EXACT SEQUENCE:
+     *  1. Snapshot (before destroy): playback state of record — pipPlaying is
+     *     the activity-local mirror of MediaNotificationService's state, fed by
+     *     bridge.onMediaStatus -> handleMediaStatus — plus the dead view's
+     *     parent, child index, layout params and current URL.
+     *  2. Teardown: teardownWebView() on the dead view (same hygiene as the
+     *     normal destroy path; the client deliberately does NOT destroy it so
+     *     the parent info can be captured first).
+     *  3. Rebuild: createPlayerWebView() — identical settings/clients/proxy as
+     *     the original (single canonical configuration point).
+     *  4. Re-attach: the fresh view takes the dead view's slot in the parent;
+     *     MediaNotificationService.webView is re-pointed at it (the service
+     *     holds the WebView reference — notification actions and wakeAndRun go
+     *     through it); webViewError is cleared so the error screen doesn't
+     *     linger.
+     *  5. Two-phase injection re-runs automatically: phase 1 (document-start)
+     *     is installed inside createPlayerWebView before the first loadUrl;
+     *     phase 2 runs via onPageFinished -> injectPlayerControl on the new
+     *     client instance (which also re-registers its prefs listener).
+     *  6. Playback restore: onPlayerInjected fires when phase 2 is queued; if
+     *     the snapshot said "was playing", actPlayPause(true) resumes it — the
+     *     fresh page restores queue/session from the account cookies, so no app
+     *     restart is needed.
+     */
+    private fun handleRendererGone(deadView: WebView) {
+        Logger.e(TAG, "renderer gone: starting recovery")
+        webViewError.value = null
+        val parent = deadView.parent as? ViewGroup
+        val index = parent?.indexOfChild(deadView) ?: -1
+        val lp = deadView.layoutParams
+        RendererRecoveryCoordinator(object : RendererRecoveryCoordinator.Steps<WebView> {
+            override fun snapshotPlayback(): Boolean = pipPlaying
+            override fun snapshotUrl(): String? = deadView.url
+            override fun destroyOld() = teardownWebView(deadView)
+            override fun createNew(url: String): WebView = createPlayerWebView(this@MainActivity, url)
+            override fun attachNew(view: WebView) {
+                if (lp != null) view.layoutParams = lp
+                if (parent != null) {
+                    if (index >= 0) parent.addView(view, index) else parent.addView(view)
+                }
+                webView = view
+            }
+            override fun bindService(view: WebView) {
+                MediaNotificationService.webView = view
+            }
+            override fun armPlaybackRestore(wasPlaying: Boolean) {
+                pendingRendererRestorePlaying = wasPlaying
+                Logger.i(TAG, "renderer recovery complete, restorePlaying=$wasPlaying")
+            }
+        }).recover()
+    }
+
+    /** B4 step 6 — one-shot playback re-attach after the rebuilt WebView's injection. */
+    private fun handlePlayerInjected() {
+        if (!pendingRendererRestorePlaying) return
+        pendingRendererRestorePlaying = false
+        Logger.i(TAG, "renderer recovery: re-attaching playback (was playing)")
+        webView?.evaluateJavascript(
+            "try{if(typeof actPlayPause==='function') actPlayPause(true);}catch(e){}",
+            null
+        )
     }
 
     private fun applyOrientation() {
@@ -1370,9 +1531,69 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    /**
+     * B3 — staged shedding on memory pressure.
+     * TRIM_MEMORY_UI_HIDDEN and above: drop the RAM cache (clearCache(false) —
+     * disk cache kept so foreground reloads stay fast).
+     * TRIM_MEMORY_MODERATE and above: also notify injected JS via
+     * window.__spotilol.onMemoryPressure(level, name) (stub in the
+     * document-start bootstrap until list virtualization implements it).
+     * The level mapping lives in TrimMemoryPolicy (unit-tested).
+     */
+    override fun onTrimMemory(level: Int) {
+        super.onTrimMemory(level)
+        Logger.d(TAG, "trim memory: level=$level")
+        if (TrimMemoryPolicy.shouldClearRamCache(level)) {
+            try {
+                webView?.clearCache(false)
+                Logger.i(TAG, "trim memory: RAM cache cleared (level=$level)")
+            } catch (e: Exception) {
+                Logger.w(TAG, "trim memory: clearCache failed: ${e.message}")
+            }
+        }
+        TrimMemoryPolicy.pressureName(level)?.let { name ->
+            webView?.evaluateJavascript(TrimMemoryPolicy.buildPressureJs(level, name), null)
+        }
+    }
+
+    /**
+     * B1 — background: pause this WebView's layout/JS pipeline and ALL JS
+     * timers globally. The <audio> element keeps playing (media stack is
+     * separate; Chromium exempts audible renderers — RESEARCH.md B2), but this
+     * MUST be verified per System WebView version: if audio stalls anywhere,
+     * flip the "WebViewNativePause" pref to false and the __splBg JS mechanism
+     * becomes the only background quiesce (fallback; default native-pause ON).
+     * Skipped in PiP: the activity is paused but visible, and the PiP video
+     * overlay needs the renderer alive.
+     */
+    override fun onPause() {
+        super.onPause()
+        if (isInPictureInPictureMode) {
+            Logger.d(TAG, "onPause in PiP: native webview pause skipped")
+            return
+        }
+        if (!prefs.getBoolean("WebViewNativePause", true)) {
+            Logger.d(TAG, "WebViewNativePause pref off: relying on __splBg only")
+            return
+        }
+        Logger.i(TAG, "activity paused: native webview pause + pauseTimers")
+        pauseCoordinator.pauseAll()
+    }
+
     override fun onStop() {
         super.onStop()
         Logger.i(TAG, "activity stopped: suspending webview loops")
+        // B2: backgrounded — let the OS reclaim the renderer under memory
+        // pressure (audible renderers stay exempt; the foreground service
+        // keeps playback alive regardless). Added in O; guarded.
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            try {
+                webView?.setRendererPriorityPolicy(WebView.RENDERER_PRIORITY_BOUND, true)
+                Logger.d(TAG, "renderer priority -> BOUND (backgrounded)")
+            } catch (e: Exception) {
+                Logger.w(TAG, "setRendererPriorityPolicy(BOUND) failed: ${e.message}")
+            }
+        }
         webView?.evaluateJavascript("""
             try {
                 window.__splBg = true;
@@ -1387,6 +1608,18 @@ class MainActivity : ComponentActivity() {
         super.onResume()
         Logger.i(TAG, "activity resumed: restoring webview loops")
 
+        // B2: renderer is important again while foregrounded (API 26+).
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            try {
+                webView?.setRendererPriorityPolicy(WebView.RENDERER_PRIORITY_IMPORTANT, false)
+                Logger.d(TAG, "renderer priority -> IMPORTANT (foregrounded)")
+            } catch (e: Exception) {
+                Logger.w(TAG, "setRendererPriorityPolicy(IMPORTANT) failed: ${e.message}")
+            }
+        }
+        // B1: resume everything the native pause stopped (symmetric pair with
+        // onPause; no-ops when the pause never ran, e.g. pref off or PiP).
+        pauseCoordinator.resumeAll()
 
         prefs = getSharedPreferences("spotilol_prefs", MODE_PRIVATE)
         serviceEnabledState.value = prefs.getBoolean("ServiceOn", true)
@@ -1407,9 +1640,16 @@ class MainActivity : ComponentActivity() {
             view.evaluateJavascript("""
                 try {
                     window.__splBg = false;
-                    if(window.__splWasPfint) { window.__splWasPfint = false; firstFuck(); }
-                    if(window.__splWasAfint) { window.__splWasAfint = false; addAutoFeatures(); }
-                    if(window.__splWasCssint) { window.__splWasCssint = false; addCSSJSHack(); }
+                    // B1 restore: interval inventory audit (2026-10-10) — onStop
+                    // clearInterval's exactly {pfint, afint, cssint}
+                    // (MainLoop.firstFuck, AutoFeatures.addAutoFeatures,
+                    // CssHack.addCSSJSHack); ALL are restarted here. Every other
+                    // injected interval is covered by the symmetric
+                    // pauseTimers/resumeTimers pair, and most also honor the
+                    // __splBg in-page guard as the complement.
+                    if(window.__splWasPfint) { window.__splWasPfint = false; if(typeof firstFuck==='function') firstFuck(); }
+                    if(window.__splWasAfint) { window.__splWasAfint = false; if(typeof addAutoFeatures==='function') addAutoFeatures(); }
+                    if(window.__splWasCssint) { window.__splWasCssint = false; if(typeof addCSSJSHack==='function') addCSSJSHack(); }
                     if(window.autoPlayMode === 'onetime') {
                         window.__splApDone = false;
                         window.__splApActive = false;
@@ -1514,13 +1754,9 @@ class MainActivity : ComponentActivity() {
         pipVideoActive.value = false
         hidePipOverlay()
         webView?.let {
-            it.stopLoading()
             it.clearHistory()
             it.clearFormData()
-            it.removeJavascriptInterface("AndBridge")
-            (it.parent as? ViewGroup)?.removeView(it)
-            it.removeAllViews()
-            it.destroy()
+            teardownWebView(it)
         }
         webView = null
         MediaNotificationService.webView = null
@@ -1529,3 +1765,142 @@ class MainActivity : ComponentActivity() {
     }
 }
 
+
+// ---------------------------------------------------------------------------
+// Stream A/B helpers — pure / Android-light, unit-testable.
+// ---------------------------------------------------------------------------
+
+/**
+ * A2 — live WebView budget. Every WebView(...) construction site calls
+ * noteCreated(); every destroy() path calls noteDestroyed(). noteCreated
+ * returns true when more than one WebView is alive — the caller logs the A2
+ * debug warning (">1 live WebView"). No logging in here so JVM unit tests
+ * can drive it (Logger touches android.util.Log).
+ */
+internal object WebViewBudget {
+    @Volatile
+    var liveCount: Int = 0
+        private set
+
+    fun noteCreated(tag: String): Boolean {
+        liveCount++
+        return liveCount > 1
+    }
+
+    fun noteDestroyed() {
+        liveCount = (liveCount - 1).coerceAtLeast(0)
+    }
+
+    fun resetForTests() {
+        liveCount = 0
+    }
+}
+
+/**
+ * Minimal surface the app needs from a throwaway WebView, so the
+ * destroy-guarantee is unit-testable without instantiating
+ * android.webkit.WebView on the JVM.
+ */
+internal interface TransientWebView {
+    fun clearCache(includeDiskFiles: Boolean)
+    fun clearHistory()
+    fun clearFormData()
+    fun destroy()
+}
+
+internal class RealTransientWebView(private val wv: WebView) : TransientWebView {
+    override fun clearCache(includeDiskFiles: Boolean) = wv.clearCache(includeDiskFiles)
+    override fun clearHistory() = wv.clearHistory()
+    override fun clearFormData() = wv.clearFormData()
+    override fun destroy() = wv.destroy()
+}
+
+internal data class TransientResult<T>(val value: T, val overBudget: Boolean)
+
+/**
+ * A2 — runs [block] with a transient WebView and guarantees destroy() on ALL
+ * paths, including exceptions from create() or block(). The budget counter is
+ * kept consistent on every path; overBudget tells the caller whether a second
+ * WebView was alive (A2 debug warning).
+ */
+internal fun <T> useTransientWebView(
+    create: () -> TransientWebView,
+    block: (TransientWebView) -> T
+): TransientResult<T> {
+    val overBudget = WebViewBudget.noteCreated("transient")
+    val wv = try {
+        create()
+    } catch (e: Exception) {
+        WebViewBudget.noteDestroyed()
+        throw e
+    }
+    return try {
+        TransientResult(block(wv), overBudget)
+    } finally {
+        try {
+            wv.destroy()
+        } finally {
+            WebViewBudget.noteDestroyed()
+        }
+    }
+}
+
+/**
+ * B1 — symmetric native pause/resume for the WebView.
+ * pauseAll(): instance.onPause() then global pauseTimers().
+ * resumeAll(): global resumeTimers() then instance.onResume().
+ * Every paused thing is resumed; unit-tested with fakes.
+ */
+internal class WebViewPauseCoordinator(
+    private val instanceOps: InstanceOps,
+    private val globalOps: GlobalOps
+) {
+    interface InstanceOps {
+        fun pause()
+        fun resume()
+    }
+
+    interface GlobalOps {
+        fun pauseTimers()
+        fun resumeTimers()
+    }
+
+    fun pauseAll() {
+        instanceOps.pause()
+        globalOps.pauseTimers()
+    }
+
+    fun resumeAll() {
+        globalOps.resumeTimers()
+        instanceOps.resume()
+    }
+}
+
+/**
+ * B4 — renderer-crash rebuild as an explicit, ordered, testable sequence.
+ * The Activity implements Steps with real WebViews; unit tests use fakes.
+ * (Two-phase injection re-runs inside createNew: document-start scripts are
+ * installed before the first loadUrl, and onPageFinished -> injectPlayerControl
+ * fires on the new client instance.)
+ */
+internal class RendererRecoveryCoordinator<V>(private val steps: Steps<V>) {
+    interface Steps<V> {
+        fun snapshotPlayback(): Boolean
+        fun snapshotUrl(): String?
+        fun destroyOld()
+        fun createNew(url: String): V
+        fun attachNew(view: V)
+        fun bindService(view: V)
+        fun armPlaybackRestore(wasPlaying: Boolean)
+    }
+
+    fun recover() {
+        val wasPlaying = steps.snapshotPlayback()
+        val url = steps.snapshotUrl() ?: "https://open.spotify.com/"
+        steps.destroyOld()
+        val fresh = steps.createNew(url)
+        steps.attachNew(fresh)
+        steps.bindService(fresh)
+        steps.armPlaybackRestore(wasPlaying)
+    }
+}

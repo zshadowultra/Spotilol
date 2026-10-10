@@ -22,8 +22,9 @@ import java.util.Locale
 class SpotifyWebViewClient(
     private val onLoginRequired: () -> Unit,
     private val onNavStateChanged: ((Boolean) -> Unit)? = null,
-    private val onRenderProcessGone: (() -> Unit)? = null,
-    private val onWebViewError: ((errorCode: Int, description: String) -> Unit)? = null
+    private val onRenderProcessGone: ((deadView: WebView) -> Unit)? = null,
+    private val onWebViewError: ((errorCode: Int, description: String) -> Unit)? = null,
+    private val onPlayerInjected: (() -> Unit)? = null
 ) : WebViewClient() {
 
     private var currentWebView: WebView? = null
@@ -175,6 +176,7 @@ class SpotifyWebViewClient(
             add("window.__splPowerSavePref=$powerSave;")
             add("window.__splHideEmpty=$hideEmptyPlayer;")
             add("window.__splPlaylistSortEnabled=$playlistSort;")
+            add(MEMORY_PRESSURE_STUB_JS)
             add(if (isGoogle) GoogleSpoof.CONTENT else BrowserSpoof.CONTENT)
             add(FetchOverride.CONTENT)
             add(AdStateHook.CONTENT)
@@ -191,13 +193,25 @@ class SpotifyWebViewClient(
     private fun isWebPlayerUrl(url: String?): Boolean =
         url != null && (url == WEB_PLAYER_ORIGIN || url.startsWith("$WEB_PLAYER_ORIGIN/"))
 
+    /**
+     * B4 — renderer-death entry point. Returns true (we handle it).
+     *
+     * The dead view is NOT destroyed here: the owner (MainActivity) must
+     * capture the view's parent / layout params / current URL BEFORE destroy,
+     * so the callback receives the dead view and owns the full teardown +
+     * rebuild sequence (see MainActivity.handleRendererGone for the exact
+     * ordered steps). If nobody handles it, fall back to destroying the view
+     * so no zombie renderer is left behind.
+     */
     override fun onRenderProcessGone(view: WebView?, detail: RenderProcessGoneDetail?): Boolean {
         Logger.e(TAG, "renderer process gone: crashed=${detail?.didCrash()}")
-        view?.let {
-            it.stopLoading()
-            it.destroy()
+        view?.stopLoading()
+        val cb = onRenderProcessGone
+        if (view != null && cb != null) {
+            cb(view)
+        } else {
+            view?.destroy()
         }
-        onRenderProcessGone?.invoke()
         return true
     }
 
@@ -349,35 +363,24 @@ class SpotifyWebViewClient(
                 "scrollbar=$showScrollbar css=${customCss.length}chars lyrics=$lyricsStyle"
         )
 
-        val js = buildString {
-            append("window.autoPlayMode='$autoPlayMode';\n")
-            append("window.closeNpPref=$closeNowPlay;\n")
-            append("window.__spotilolUseProxy=$useProxy;\n")
-            append("window.__splTakeControl=$takeControl;\n")
-            append("window.__splHideEmpty=$hideEmptyPlayer;\n")
-            append("window.__splPlaylistSortEnabled=$playlistSortEnabled;\n")
-            append("window.__splShowScrollbar=$showScrollbar;\n")
-            if (debugOverlay) {
-                append(DevLogPrelude.js())
-                append("\n")
-            }
-            append(PlayerCore.CONTENT)
-            append(TrackObserver.CONTENT)
-            append(ClassicBridge.CONTENT)
-            append(MediaUpdater.CONTENT)
-            append(LibraryFetcher.CONTENT)
-            append(LibraryParser.CONTENT)
-            append(PlaybackControls.CONTENT)
-            append(AndroidAuto.CONTENT)
-            append(MainLoop.CONTENT)
-            append(AutoFeatures.CONTENT)
-            append(AndroidTracker.CONTENT)
-            append(SearchOverlay.CONTENT)
-            append(DownloadButton.CONTENT)
-            append(DownloadProgress.CONTENT)
-            append(CollectionDownload.CONTENT)
-            append(ContextMenuDownload.CONTENT)
-            append("""
+        // C4: the post-login payload is assembled as named chunks, then split
+        // into an immediate (time-to-interactive) chunk and a deferred chunk.
+        // Only the evaluateJavascript timing changes — the call graph is intact.
+        val chunks = assemblePlayerChunks(
+            flagsJs = buildString {
+                append("window.autoPlayMode='$autoPlayMode';\n")
+                append("window.closeNpPref=$closeNowPlay;\n")
+                append("window.__spotilolUseProxy=$useProxy;\n")
+                append("window.__splTakeControl=$takeControl;\n")
+                append("window.__splHideEmpty=$hideEmptyPlayer;\n")
+                append("window.__splPlaylistSortEnabled=$playlistSortEnabled;\n")
+                append("window.__splShowScrollbar=$showScrollbar;\n")
+                if (debugOverlay) {
+                    append(DevLogPrelude.js())
+                    append("\n")
+                }
+            },
+            recAccountJs = """
                 (function(){
                     var recAcc=function(){
                         try{
@@ -391,33 +394,31 @@ class SpotifyWebViewClient(
                     setTimeout(recAcc,5000);
                     setInterval(recAcc,60000);
                 })();
-            """.trimIndent())
-            append(CssHack.CONTENT)
-            append(ModalFix.CONTENT)
-            append(ErrorDialogRestyle.CONTENT)
-            append(ToastFix.CONTENT)
-            append(LyricsSyncFix.CONTENT)
-            append(QueueAutoClose.CONTENT)
-            append(LibraryAutoClose.CONTENT)
-            append(PlaylistSort.CONTENT)
-            if (playerMode == "spotilol") {
-                append(SpotilolPlayer.CONTENT)
-            }
-            if (playerMode == "customui") {
-                append(CustomUI.CONTENT)
-            }
-        }
-        val cleanJs = JsUtils.stripConsoleLogs(js) + "\n" +
-                buildAmoledJs(amoledEnabled) + "\n" +
+            """.trimIndent(),
+            playerMode = playerMode
+        )
+        val (coreJs, deferredJs) = splitPlayerPayload(chunks)
+        val themeJs = buildAmoledJs(amoledEnabled) + "\n" +
                 AccentTheme.buildAccentJs(view.context) + "\n" +
                 buildCustomCssJs(customCss) + "\n" +
                 LyricsTheme.buildLyricsStyleJs(lyricsStyle)
-        if (playerMode == "original") {
-            view.evaluateJavascript(cleanJs + "\n(function(){var s=document.createElement('style');s.id='spl-np-show';s.textContent='aside[data-testid=\"now-playing-bar\"]{display:flex!important}';document.head.appendChild(s);})();", null)
-        } else {
-            view.evaluateJavascript(cleanJs, null)
-        }
-        Logger.d(TAG, "injected ${cleanJs.length} bytes (engine=$playerMode)")
+
+        val coreBytes = coreJs.toByteArray(Charsets.UTF_8).size
+        val deferredBytes = deferredJs.toByteArray(Charsets.UTF_8).size
+        Logger.d(
+            TAG,
+            "payload split: core=${coreBytes}B immediate, deferred=${deferredBytes}B on idle " +
+                "(engine=$playerMode)"
+        )
+
+        injectSplitPayload(
+            evaluate = { js -> view.evaluateJavascript(js, null) },
+            coreJs = coreJs,
+            themeJs = themeJs,
+            deferredJs = deferredJs,
+            playerMode = playerMode
+        )
+        onPlayerInjected?.invoke()
     }
 
     private fun registerPrefsListener(view: WebView) {
@@ -530,4 +531,214 @@ class SpotifyWebViewClient(
             } catch(e){}
         """.trimIndent()
     }
+}
+
+// ---------------------------------------------------------------------------
+// B3 — window.__spotilol.onMemoryPressure hook stub (injection bootstrap).
+//
+// The real implementation (shrink virtualized-list overscan, drop the
+// in-memory artwork cache, cancel prefetch queues) lands with the list
+// virtualization work; this stub only guarantees the native call site never
+// throws on an undefined function, and never overrides an implementation
+// injected later (the || keeps whichever definition wins first).
+// ---------------------------------------------------------------------------
+internal val MEMORY_PRESSURE_STUB_JS = """
+    window.__spotilol = window.__spotilol || {};
+    window.__spotilol.onMemoryPressure = window.__spotilol.onMemoryPressure || function(level, name) {
+    };
+""".trimIndent()
+
+/**
+ * B3 — pure mapping of Android onTrimMemory levels to WebView shedding
+ * actions. Kept free of Android calls so it is unit-testable; the Activity
+ * applies the resulting actions.
+ */
+internal object TrimMemoryPolicy {
+    /** RAM-only cache eviction at TRIM_MEMORY_UI_HIDDEN and above (disk kept). */
+    fun shouldClearRamCache(level: Int): Boolean =
+        level >= android.content.ComponentCallbacks2.TRIM_MEMORY_UI_HIDDEN
+
+    /**
+     * JS memory-pressure hook at MODERATE and above; null means "no JS call".
+     * Returns the severity name handed to window.__spotilol.onMemoryPressure.
+     */
+    fun pressureName(level: Int): String? = when {
+        level >= android.content.ComponentCallbacks2.TRIM_MEMORY_COMPLETE -> "critical"
+        level >= android.content.ComponentCallbacks2.TRIM_MEMORY_MODERATE -> "moderate"
+        else -> null
+    }
+
+    fun buildPressureJs(level: Int, name: String): String =
+        "try{if(window.__spotilol&&typeof window.__spotilol.onMemoryPressure==='function')" +
+            "{window.__spotilol.onMemoryPressure($level,'$name');}}catch(e){}"
+}
+
+// ---------------------------------------------------------------------------
+// C4 — post-login payload split: critical (immediate) vs deferred (idle).
+//
+// Only the evaluateJavascript TIMING changes; the JS call graph is untouched.
+// Dependency audit (2026-10-10): no core chunk references a deferred chunk's
+// window.* symbols at inject time —
+//   * DownloadProgress.kt DEFINES window.splDownloadProgress (core);
+//     CollectionDownload.kt only *calls* it behind a typeof guard.
+//   * PlaylistSort wraps window.fetch at its own inject time (document-start
+//     FetchOverride already installed, so ordering is preserved).
+//   * SearchOverlay/ContextMenuDownload expose init-guarded entry points
+//     (splSearchInit / __splCtxDlInit / __splColDlInit); nothing in core or in
+//     native code (MainActivity, bridge, MediaNotificationService) touches
+//     them — the PlaylistSortEnabled pref listener guards with
+//     `if(window.splPlaylistSort)`.
+// ---------------------------------------------------------------------------
+
+/** Chunk names injected on requestIdleCallback (fallback setTimeout 3000). */
+internal val DEFERRED_CHUNK_NAMES = setOf(
+    "SearchOverlay",
+    "CollectionDownload",
+    "ContextMenuDownload",
+    "PlaylistSort"
+)
+
+internal data class NamedChunk(val name: String, val js: String)
+internal data class PayloadChunks(val coreJs: String, val deferredJs: String)
+
+/**
+ * Assembles the post-login payload as ordered named chunks. Pure string
+ * assembly (no WebView) so chunk membership and ordering are unit-testable.
+ */
+internal fun assemblePlayerChunks(
+    flagsJs: String,
+    recAccountJs: String,
+    playerMode: String
+): List<NamedChunk> = listOf(
+    NamedChunk("flags", flagsJs),
+    // Core (immediate): everything needed for time-to-interactive.
+    NamedChunk("PlayerCore", com.project.lol.webview.injections.PlayerCore.CONTENT),
+    NamedChunk("TrackObserver", com.project.lol.webview.injections.TrackObserver.CONTENT),
+    NamedChunk("ClassicBridge", com.project.lol.webview.injections.ClassicBridge.CONTENT),
+    NamedChunk("MediaUpdater", com.project.lol.webview.injections.MediaUpdater.CONTENT),
+    NamedChunk("LibraryFetcher", com.project.lol.webview.injections.LibraryFetcher.CONTENT),
+    NamedChunk("LibraryParser", com.project.lol.webview.injections.LibraryParser.CONTENT),
+    NamedChunk("PlaybackControls", com.project.lol.webview.injections.PlaybackControls.CONTENT),
+    NamedChunk("AndroidAuto", com.project.lol.webview.injections.AndroidAuto.CONTENT),
+    NamedChunk("MainLoop", com.project.lol.webview.injections.MainLoop.CONTENT),
+    NamedChunk("AutoFeatures", com.project.lol.webview.injections.AutoFeatures.CONTENT),
+    NamedChunk("AndroidTracker", com.project.lol.webview.injections.AndroidTracker.CONTENT),
+    // Deferred: downloads UI, sort, search overlay.
+    NamedChunk("SearchOverlay", com.project.lol.webview.injections.SearchOverlay.CONTENT),
+    // Core resumes.
+    NamedChunk("DownloadButton", com.project.lol.webview.injections.DownloadButton.CONTENT),
+    NamedChunk("DownloadProgress", com.project.lol.webview.injections.DownloadProgress.CONTENT),
+    // Deferred.
+    NamedChunk("CollectionDownload", com.project.lol.webview.injections.CollectionDownload.CONTENT),
+    NamedChunk("ContextMenuDownload", com.project.lol.webview.injections.ContextMenuDownload.CONTENT),
+    // Core resumes.
+    NamedChunk("recAccount", recAccountJs),
+    NamedChunk("CssHack", com.project.lol.webview.injections.CssHack.CONTENT),
+    NamedChunk("ModalFix", com.project.lol.webview.injections.ModalFix.CONTENT),
+    NamedChunk("ErrorDialogRestyle", com.project.lol.webview.injections.ErrorDialogRestyle.CONTENT),
+    NamedChunk("ToastFix", com.project.lol.webview.injections.ToastFix.CONTENT),
+    NamedChunk("LyricsSyncFix", com.project.lol.webview.injections.LyricsSyncFix.CONTENT),
+    NamedChunk("QueueAutoClose", com.project.lol.webview.injections.QueueAutoClose.CONTENT),
+    NamedChunk("LibraryAutoClose", com.project.lol.webview.injections.LibraryAutoClose.CONTENT),
+    // Deferred.
+    NamedChunk("PlaylistSort", com.project.lol.webview.injections.PlaylistSort.CONTENT),
+    // Player engine (immediate — it IS the visible player).
+    NamedChunk(
+        "SpotilolPlayer",
+        if (playerMode == "spotilol") com.project.lol.webview.injections.SpotilolPlayer.CONTENT else ""
+    ),
+    NamedChunk(
+        "CustomUI",
+        if (playerMode == "customui") com.project.lol.webview.injections.CustomUI.CONTENT else ""
+    )
+)
+
+/**
+ * Evaluates the split payload: the core chunk immediately (time-to-interactive),
+ * then the deferred chunk via the in-page idle scheduler. Extracted so the
+ * core-before-deferred order is unit-testable with a recording evaluator.
+ */
+internal fun injectSplitPayload(
+    evaluate: (String) -> Unit,
+    coreJs: String,
+    themeJs: String,
+    deferredJs: String,
+    playerMode: String
+) {
+    if (playerMode == "original") {
+        evaluate(coreJs + "\n" + themeJs + "\n" + NP_SHOW_STYLE_JS)
+    } else {
+        evaluate(coreJs + "\n" + themeJs)
+    }
+    // Deferred chunks (downloads UI, PlaylistSort, SearchOverlay) run on
+    // requestIdleCallback, setTimeout(3000) fallback.
+    evaluate(buildDeferredSchedulerJs(deferredJs))
+}
+
+internal const val NP_SHOW_STYLE_JS =
+    "(function(){var s=document.createElement('style');s.id='spl-np-show';" +
+        "s.textContent='aside[data-testid=\"now-playing-bar\"]{display:flex!important}';" +
+        "document.head.appendChild(s);})();"
+
+/** Partitions named chunks into the immediate core payload and the deferred payload. */
+internal fun splitPlayerPayload(chunks: List<NamedChunk>): PayloadChunks {
+    val core = chunks.filter { it.name !in DEFERRED_CHUNK_NAMES }
+    val deferred = chunks.filter { it.name in DEFERRED_CHUNK_NAMES }
+    return PayloadChunks(
+        coreJs = com.project.lol.webview.helpers.JsUtils.stripConsoleLogs(core.joinToString("\n") { it.js }),
+        deferredJs = com.project.lol.webview.helpers.JsUtils.stripConsoleLogs(deferred.joinToString("\n") { it.js })
+    )
+}
+
+/**
+ * Minimal JSON string escaper (pure Kotlin). org.json.JSONObject is an Android
+ * stub that throws on JVM unit tests, so the scheduler's quoting cannot rely
+ * on it.
+ */
+internal fun jsonQuote(s: String): String {
+    val sb = StringBuilder(s.length + 2).append('"')
+    for (c in s) {
+        when (c) {
+            '"' -> sb.append("\\\"")
+            '\\' -> sb.append("\\\\")
+            '\b' -> sb.append("\\b")
+            '\u000C' -> sb.append("\\f")
+            '\n' -> sb.append("\\n")
+            '\r' -> sb.append("\\r")
+            '\t' -> sb.append("\\t")
+            '/' -> sb.append("\\/")
+            else -> if (c < ' ') sb.append("\\u%04x".format(c.code)) else sb.append(c)
+        }
+    }
+    return sb.append('"').toString()
+}
+
+/**
+ * Builds the tiny in-page scheduler that evals the deferred payload on
+ * requestIdleCallback (timeout 3000ms), falling back to setTimeout(3000).
+ * The payload rides as a JSON string literal and is eval'd exactly once.
+ * open.spotify.com's CSP includes 'unsafe-eval' (verified 2026-10-10), so the
+ * eval is not blocked. One schedule per page (guard flag).
+ */
+internal fun buildDeferredSchedulerJs(deferredJs: String): String {
+    val quoted = jsonQuote(deferredJs)
+    return """
+        (function(){
+            try {
+                if (window.__splDeferredScheduled) return;
+                window.__splDeferredScheduled = true;
+                var src = $quoted;
+                var run = function(){
+                    if (window.__splDeferredRan) return;
+                    window.__splDeferredRan = true;
+                    try { (0,eval)(src); } catch(e) {}
+                    src = null;
+                };
+                if (window.requestIdleCallback) {
+                    try { window.requestIdleCallback(function(){ run(); }, {timeout: 3000}); }
+                    catch(e) { setTimeout(run, 3000); }
+                } else { setTimeout(run, 3000); }
+            } catch(e) {}
+        })();
+    """.trimIndent()
 }
