@@ -5,7 +5,8 @@ import java.util.concurrent.TimeUnit
 import org.junit.Assume
 
 /**
- * Runs the node-based UX-perf drivers (app/src/test/node/drivers/*.js) against
+ * Runs the node-based UX-perf drivers (app/src/test/node/drivers/, one .js per
+ * driver) against
  * the JS actually embedded in the Kotlin injection sources. Used by UxPerfTest.
  * Local equivalent without Gradle: node app/src/test/node/run-local.js
  */
