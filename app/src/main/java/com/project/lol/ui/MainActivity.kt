@@ -1282,6 +1282,12 @@ class MainActivity : ComponentActivity() {
      * recovery, so a rebuilt WebView always gets identical settings.
      */
     private fun createPlayerWebView(context: Context, initialUrl: String): WebView {
+        // WebViews must be created on the main thread — and Android pins the
+        // process to the first WebView's thread. Fail loudly here instead of
+        // surfacing as a cryptic WebViewChromium.init crash downstream.
+        check(Looper.getMainLooper().isCurrentThread) {
+            "createPlayerWebView must run on the main thread (was ${Thread.currentThread().name})"
+        }
         val bridge = spotifyBridge ?: SpotifyBridge(WeakReference(this)).also { spotifyBridge = it }
         val useProxy = prefs.getString("ConnectionMode", "normal") == "proxy"
         return WebView(context).apply {

@@ -1,9 +1,6 @@
 package com.project.lol
 
 import android.app.Application
-import android.os.Handler
-import android.os.HandlerThread
-import android.webkit.WebView
 import com.project.lol.util.CrashHandler
 import com.project.lol.util.Logger
 
@@ -14,38 +11,12 @@ class SpotilolApp : Application() {
         Logger.init(this)
         CrashHandler.install(this)
         Logger.s("app", "started")
-        // A1: warm the Chromium engine now so the player WebView starts warm.
-        warmChromiumEngine()
-    }
-
-    /**
-     * A1 — Chromium engine warmup.
-     *
-     * Creating the first WebView in a process pays for the renderer-process
-     * spawn, native library load and GPU init. Doing it here (once, on a
-     * background thread with its own Looper) moves that cost off the
-     * MainActivity cold-start path; the throwaway instance is destroyed
-     * immediately so no renderer is left alive.
-     *
-     * Best-effort by design: any failure is logged and swallowed — a missed
-     * warmup must never break app start (correctness first).
-     */
-    private fun warmChromiumEngine() {
-        try {
-            val thread = HandlerThread("wv-warmup").apply { start() }
-            Handler(thread.looper).post {
-                try {
-                    val wv = WebView(this@SpotilolApp)
-                    wv.destroy()
-                    Logger.d("app", "chromium engine warmed (throwaway webview created+destroyed)")
-                } catch (e: Exception) {
-                    Logger.w("app", "webview warmup failed: ${e.message}")
-                } finally {
-                    thread.quitSafely()
-                }
-            }
-        } catch (e: Exception) {
-            Logger.w("app", "webview warmup skipped: ${e.message}")
-        }
+        // NOTE: no Chromium "warmup" here. A WebView MUST be created on the
+        // main thread, and Android pins the whole process to the thread of the
+        // first WebView created: a background-thread warmup (previously tried
+        // here on a HandlerThread) makes the real WebView in MainActivity throw
+        // IllegalStateException("Calling View methods on another thread than
+        // the UI thread") at WebViewChromium.init on first launch. The one-time
+        // engine init cost is paid by the first real WebView instead.
     }
 }
