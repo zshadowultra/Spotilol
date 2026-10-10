@@ -107,9 +107,9 @@ object NodeRunner {
         fun sub(token: String, value: String) {
             val re = Regex("^$token$", RegexOption.MULTILINE)
             require(re.containsMatchIn(body)) { "placeholder missing: $token" }
-            // quoteReplacement: escape $ and \ for appendReplacement semantics
-            val safe = value.replace("\\", "\\\\").replace("$", "\\$")
-            body = re.replaceFirst(body) { _ -> safe }
+            // quoteReplacement: $ and \ in value must stay literal, not act as
+            // group references / escapes in appendReplacement semantics.
+            body = re.replaceFirst(body, java.util.regex.Matcher.quoteReplacement(value))
         }
         sub("__SPLUX__", splux)
         if (Regex("^__PAINT__$", RegexOption.MULTILINE).containsMatchIn(body)) sub("__PAINT__", paintFn)
