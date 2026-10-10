@@ -37,10 +37,10 @@ function mkEl() { return { innerHTML: '', __splPh: undefined }; }
 document._els['spl-play'] = mkEl();
 document._els['spl-play-mini'] = mkEl();
 window.splPaintPlayIcon(true);
-assert.ok(document._els['spl-play'].innerHTML.includes('M2.7 1a.7.7'), 'pause glyph painted');
+assert.ok(document._els['spl-play'].innerHTML.includes('M2 6C2 4.11438'), 'pause glyph painted');
 assert.strictEqual(document._els['spl-play'].__splPh, document._els['spl-play'].innerHTML,
   '__splPh synced so splUpdate will not clobber the optimistic paint');
 assert.strictEqual(document._els['spl-play-mini'].__splPh, document._els['spl-play'].innerHTML, 'mini button painted too');
 window.splPaintPlayIcon(false);
-assert.ok(document._els['spl-play'].innerHTML.includes('M3 1.713'), 'play glyph painted');
+assert.ok(document._els['spl-play'].innerHTML.includes('M20.4086 9.35258'), 'play glyph painted');
 console.log('PASS optimistic');
