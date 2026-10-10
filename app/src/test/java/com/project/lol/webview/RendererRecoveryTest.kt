@@ -1,5 +1,6 @@
 package com.project.lol.webview
 
+import com.project.lol.ui.RendererRecoveryCoordinator
 import org.junit.Assert.*
 import org.junit.Test
 

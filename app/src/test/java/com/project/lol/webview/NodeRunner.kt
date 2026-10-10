@@ -35,7 +35,7 @@ object NodeRunner {
 
     private fun contentJs(ktName: String): String {
         val kt = File(injDir, ktName).readText()
-        val m = Regex("""const val CONTENT = ""\"\n([\s\S]*)\n    ""\"""").find(kt)
+        val m = Regex("const val CONTENT = \"\"\"\n([\\s\\S]*)\n    \"\"\"").find(kt)
             ?: throw IllegalStateException("CONTENT not found in $ktName")
         return m.groupValues[1]
     }
