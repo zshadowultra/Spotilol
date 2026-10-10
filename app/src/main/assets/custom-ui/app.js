@@ -220,6 +220,15 @@
           return;
         }
 
+        // Round 2: instant revisit — restore the last-visited detail DOM
+        // snapshot when its data is still in the prefetch LRU. Skips the
+        // skeleton + fetch + re-render entirely.
+        var __snap = tryRestoreDetailSnap(list, uri);
+        if (__snap) {
+          try { setupDetailPager(__snap.next); } catch (e) {}
+          return;
+        }
+
         var url = null;
         if (uri && uri.indexOf('collection') !== -1) {
           url = 'https://api.spotify.com/v1/me/tracks?limit=50';
@@ -285,6 +294,14 @@
           try {
             if (statsEl) statsEl.innerText = tracks.length + (tracks.length === 1 ? ' song' : ' songs');
             renderPlaylistTracks(list, tracks, uri);
+            try { window.__splDetailStats.renders++; } catch (e) {}
+            // Round 2: DOM snapshot for instant revisit — only small,
+            // complete (non-virtualized, no next page) renders qualify.
+            try {
+              if (window.__splUx && window.__splUx.detailSnapSave && !nextUrl) {
+                window.__splUx.detailSnapSave(uri, list.innerHTML, tracks.length);
+              }
+            } catch (e) {}
             setupDetailPager(nextUrl);
           } catch (e) {
             window.__splLastError = String((e && e.message) || e);
@@ -393,6 +410,43 @@
       };
     }
 
+    // Binds one detail row's tap: plays the track with the playlist as context.
+    // Factored out so the DOM-snapshot restore path can rebind rows without
+    // rebuilding them (listeners don't survive innerHTML restore).
+    function bindDetailTap(row, t, contextUri) {
+      window.bindTap(row, function() {
+        if (typeof window.playFromUri === 'function') {
+          try { window.playFromUri(t.uri, contextUri); } catch (e) {}
+        }
+      });
+    }
+
+    // Round 2: try to restore the detail view from the DOM snapshot instead
+    // of re-rendering. Returns {next} when the snapshot was used (the caller
+    // then skips skeleton + fetch + render), null otherwise. Requires the
+    // prefetch LRU to still hold the uri's data — the freshness source, the
+    // same data the render path would have used.
+    function tryRestoreDetailSnap(list, uri) {
+      try {
+        window.__splDetailStats = window.__splDetailStats || { renders: 0, restores: 0 };
+        if (!list || !window.__splUx || !window.__splUx.detailSnapGet) return null;
+        if (!window.__splUx.prefetch || !window.__splUx.prefetch.cache.has(uri)) return null;
+        var html = window.__splUx.detailSnapGet(uri);
+        if (!html) return null;
+        var rec = window.__splUx.prefetch.cache.get(uri);
+        var tracks = (rec && rec.tracks) || [];
+        if (!tracks.length || tracks.length > 40) return null;
+        if (window.__splPlaylistVirt) { try { window.__splPlaylistVirt.destroy(); } catch (e) {} window.__splPlaylistVirt = null; }
+        list.innerHTML = html;
+        var rows = list.children || [];
+        for (var i = 0; i < rows.length && i < tracks.length; i++) {
+          bindDetailTap(rows[i], tracks[i], uri);
+        }
+        window.__splDetailStats.restores++;
+        return { next: (rec && rec.next) || null };
+      } catch (e) { return null; }
+    }
+
     // Render track rows into a .song-list using the existing .song-row
     // markup pattern. Row tap plays the track with the playlist as context.
     // C7: lists longer than 40 rows are virtualized (viewport + overscan only).
@@ -424,11 +478,7 @@
       tracks.forEach(function(t) {
         var row = document.createElement('div');
         bindTrackRow(row, t);
-        window.bindTap(row, function() {
-          if (typeof window.playFromUri === 'function') {
-            try { window.playFromUri(t.uri, contextUri); } catch (e) {}
-          }
-        });
+        bindDetailTap(row, t, contextUri);
         list.appendChild(row);
       });
     }
@@ -450,11 +500,12 @@
       document.getElementById('lyricsOverlay').classList.remove('open');
     }
 
+    // Play/pause glyphs: Solar "play-linear" / "pause-linear" by 480 Design, CC BY 4.0
     function togglePlayState() {
       isPlaying = !isPlaying;
       if (__b.toggle) { try { __b.toggle(); } catch (e) {} }
-      const pauseSvg = '<path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/>';
-      const playSvg = '<path d="M8 5v14l11-7z"/>';
+      const pauseSvg = '<path d="M2 6C2 4.11438 2 3.17157 2.58579 2.58579C3.17157 2 4.11438 2 6 2C7.88562 2 8.82843 2 9.41421 2.58579C10 3.17157 10 4.11438 10 6V18C10 19.8856 10 20.8284 9.41421 21.4142C8.82843 22 7.88562 22 6 22C4.11438 22 3.17157 22 2.58579 21.4142C2 20.8284 2 19.8856 2 18V6Z"/><path d="M14 6C14 4.11438 14 3.17157 14.5858 2.58579C15.1716 2 16.1144 2 18 2C19.8856 2 20.8284 2 21.4142 2.58579C22 3.17157 22 4.11438 22 6V18C22 19.8856 22 20.8284 21.4142 21.4142C20.8284 22 19.8856 22 18 22C16.1144 22 15.1716 22 14.5858 21.4142C14 20.8284 14 19.8856 14 18V6Z"/>';
+      const playSvg = '<path d="M20.4086 9.35258C22.5305 10.5065 22.5305 13.4935 20.4086 14.6474L7.59662 21.6145C5.53435 22.736 3 21.2763 3 18.9671L3 5.0329C3 2.72368 5.53435 1.26402 7.59661 2.38548L20.4086 9.35258Z"/>';
       
       const newPath = isPlaying ? pauseSvg : playSvg;
       document.getElementById('miniPlayIcon').innerHTML = newPath;
@@ -487,7 +538,7 @@
         `linear-gradient(180deg, ${accent} 0%, var(--sp-black) 60%, var(--sp-black) 100%)`;
 
       isPlaying = true;
-      const pauseSvg = '<path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/>';
+      const pauseSvg = '<path d="M2 6C2 4.11438 2 3.17157 2.58579 2.58579C3.17157 2 4.11438 2 6 2C7.88562 2 8.82843 2 9.41421 2.58579C10 3.17157 10 4.11438 10 6V18C10 19.8856 10 20.8284 9.41421 21.4142C8.82843 22 7.88562 22 6 22C4.11438 22 3.17157 22 2.58579 21.4142C2 20.8284 2 19.8856 2 18V6Z"/><path d="M14 6C14 4.11438 14 3.17157 14.5858 2.58579C15.1716 2 16.1144 2 18 2C19.8856 2 20.8284 2 21.4142 2.58579C22 3.17157 22 4.11438 22 6V18C22 19.8856 22 20.8284 21.4142 21.4142C20.8284 22 19.8856 22 18 22C16.1144 22 15.1716 22 14.5858 21.4142C14 20.8284 14 19.8856 14 18V6Z"/>';
       document.getElementById('miniPlayIcon').innerHTML = pauseSvg;
       document.getElementById('fpPlayIcon').innerHTML = pauseSvg;
       document.getElementById('headerPlayIcon').innerHTML = pauseSvg;
@@ -517,7 +568,7 @@
       } catch (e) {}
       isPlaying = true;
       try {
-        const pauseSvg = '<path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/>';
+        const pauseSvg = '<path d="M2 6C2 4.11438 2 3.17157 2.58579 2.58579C3.17157 2 4.11438 2 6 2C7.88562 2 8.82843 2 9.41421 2.58579C10 3.17157 10 4.11438 10 6V18C10 19.8856 10 20.8284 9.41421 21.4142C8.82843 22 7.88562 22 6 22C4.11438 22 3.17157 22 2.58579 21.4142C2 20.8284 2 19.8856 2 18V6Z"/><path d="M14 6C14 4.11438 14 3.17157 14.5858 2.58579C15.1716 2 16.1144 2 18 2C19.8856 2 20.8284 2 21.4142 2.58579C22 3.17157 22 4.11438 22 6V18C22 19.8856 22 20.8284 21.4142 21.4142C20.8284 22 19.8856 22 18 22C16.1144 22 15.1716 22 14.5858 21.4142C14 20.8284 14 19.8856 14 18V6Z"/>';
         document.getElementById('miniPlayIcon').innerHTML = pauseSvg;
         document.getElementById('fpPlayIcon').innerHTML = pauseSvg;
         document.getElementById('headerPlayIcon').innerHTML = pauseSvg;
@@ -564,8 +615,8 @@
         document.getElementById('fpArtwork').src = activeTrack.thumb;
         document.getElementById('fullPlayer').style.background =
           `linear-gradient(180deg, ${resolveAccent(activeTrack.colorToken)} 0%, var(--sp-black) 60%, var(--sp-black) 100%)`;
-        const pauseSvg = '<path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/>';
-        const playSvg = '<path d="M8 5v14l11-7z"/>';
+        const pauseSvg = '<path d="M2 6C2 4.11438 2 3.17157 2.58579 2.58579C3.17157 2 4.11438 2 6 2C7.88562 2 8.82843 2 9.41421 2.58579C10 3.17157 10 4.11438 10 6V18C10 19.8856 10 20.8284 9.41421 21.4142C8.82843 22 7.88562 22 6 22C4.11438 22 3.17157 22 2.58579 21.4142C2 20.8284 2 19.8856 2 18V6Z"/><path d="M14 6C14 4.11438 14 3.17157 14.5858 2.58579C15.1716 2 16.1144 2 18 2C19.8856 2 20.8284 2 21.4142 2.58579C22 3.17157 22 4.11438 22 6V18C22 19.8856 22 20.8284 21.4142 21.4142C20.8284 22 19.8856 22 18 22C16.1144 22 15.1716 22 14.5858 21.4142C14 20.8284 14 19.8856 14 18V6Z"/>';
+        const playSvg = '<path d="M20.4086 9.35258C22.5305 10.5065 22.5305 13.4935 20.4086 14.6474L7.59662 21.6145C5.53435 22.736 3 21.2763 3 18.9671L3 5.0329C3 2.72368 5.53435 1.26402 7.59661 2.38548L20.4086 9.35258Z"/>';
         const icon = isPlaying ? pauseSvg : playSvg;
         document.getElementById('miniPlayIcon').innerHTML = icon;
         document.getElementById('fpPlayIcon').innerHTML = icon;
@@ -583,7 +634,9 @@
     // ---- long-press diagnostic on the header avatar ----
     // Hold the avatar 800ms to see the last 10 logged taps, whether
     // switchTab exists, and the last caught error. For device debugging.
-    (function bindAvatarDiagnostic() {
+    // Round 2: the long-press diagnostic is device-debug tooling — keep it off
+    // the synchronous bootstrap critical path; idle-schedule it instead.
+    function bindAvatarDiagnostic() {
       function showDiag() {
         try {
           var taps = (window.__splTapLog || []).slice(-10).map(function(x) {
@@ -622,7 +675,12 @@
         var iv = setInterval(function() { if (attach()) clearInterval(iv); }, 500);
         setTimeout(function() { clearInterval(iv); }, 10000);
       }
-    })();
+    }
+    try {
+      (window.requestIdleCallback || function(f){ return setTimeout(f, 2000); })(function(){
+        try { bindAvatarDiagnostic(); } catch (e) {}
+      });
+    } catch (e) { try { bindAvatarDiagnostic(); } catch (x) {} }
 
     // ---- rebind nav tabs through bindTap ----
     // Replaces inline onclick with touchend+click listeners so tab switches

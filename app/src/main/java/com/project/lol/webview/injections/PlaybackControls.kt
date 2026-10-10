@@ -304,6 +304,47 @@ object PlaybackControls {
                     return d;
                 };
 
+                /* ---------- idle scheduling: requestIdleCallback with setTimeout fallback ---------- */
+                Ux.idle = function(fn){
+                    function run(){ try{ fn(); }catch(e){} }
+                    try{
+                        if(window.requestIdleCallback){ window.requestIdleCallback(run, {timeout:3000}); return; }
+                    }catch(e){}
+                    setTimeout(run, 2000);
+                };
+
+                /* ---------- network hints (round 2): preconnect + dns-prefetch ----------
+                   One-time <link> hints for the fixed artwork/API hosts. i.scdn.co
+                   serves artwork two ways (<img src> = non-CORS, artCache's
+                   fetch(url,{mode:'cors'}) = CORS) and the two use separate
+                   connections, so both preconnect variants are emitted; every
+                   preconnect is paired with a dns-prefetch fallback. */
+                Ux.netHints = function(){
+                    try{
+                        if(!document || !document.head) return false;
+                        var ch = document.head.children || [];
+                        for(var i=0;i<ch.length;i++){
+                            if(ch[i] && ch[i].getAttribute && ch[i].getAttribute('id')==='spl-net-hints') return true;
+                        }
+                        var marker = document.createElement('meta');
+                        marker.setAttribute('id','spl-net-hints');
+                        document.head.appendChild(marker);
+                        function link(rel, href, crossorigin){
+                            var l = document.createElement('link');
+                            l.setAttribute('rel', rel);
+                            l.setAttribute('href', href);
+                            if(crossorigin) l.setAttribute('crossorigin','anonymous');
+                            document.head.appendChild(l);
+                        }
+                        link('preconnect','https://i.scdn.co',false);
+                        link('preconnect','https://i.scdn.co',true);
+                        link('dns-prefetch','https://i.scdn.co',false);
+                        link('preconnect','https://api.spotify.com',false);
+                        link('dns-prefetch','https://api.spotify.com',false);
+                        return true;
+                    }catch(e){ return false; }
+                };
+
                 /* ---------- virtualized windowing math (pure) ----------
                    Returns inclusive [start,end] row indices intersecting the viewport
                    plus overscan on both sides. */
@@ -489,11 +530,33 @@ object PlaybackControls {
                         }).then(function(data){
                             var rec={tracks:parseTracks(data), next:(data&&data.next)||null, ts:Date.now()};
                             cache.set(uri, rec);
+                            primeArtwork(rec.tracks);
                             return rec;
                         });
                         var done=function(){ delete inflight[uri]; };
                         p.then(done,done);
                         return p;
+                    }
+                    /* Round 2: pre-warm the artwork cache when prefetch data lands.
+                       The first 8 tracks' (smallest-variant) artwork URLs are
+                       fetched into artCache on idle, so opening the detail view
+                       finds them already cached. Dwell-gated like the prefetch
+                       itself — no wasted requests for un-dwelled items. */
+                    function primeArtwork(tracks){
+                        try{
+                            if(!Ux.artCache || !Ux.artCache.prime || !tracks || !tracks.length) return;
+                            var urls=[], seen={};
+                            for(var i=0;i<tracks.length && urls.length<8;i++){
+                                var t=tracks[i]; if(!t) continue;
+                                var imgs=(t.album&&t.album.images)||[];
+                                var u=imgs.length?imgs[imgs.length-1].url:'';
+                                if(u && !seen[u]){ seen[u]=1; urls.push(u); }
+                            }
+                            if(!urls.length) return;
+                            Ux.idle(function(){
+                                for(var j=0;j<urls.length;j++){ try{ Ux.artCache.prime(urls[j]); }catch(e){} }
+                            });
+                        }catch(e){}
                     }
                     return {
                         cache: cache,
@@ -523,7 +586,7 @@ object PlaybackControls {
                    below + MEASUREMENTS-D.md), so artwork caching lives in the injected
                    layer: a memory LRU in front of an IndexedDB LRU. */
                 Ux.artCache = (function(){
-                    var MEM_CAP=60, IDB_CAP=100;
+                    var MEM_CAP=60, IDB_CAP=250;
                     var mem = Ux.lru(MEM_CAP);
                     var dbPromise=null;
                     function log(m){ try{ if(window.AndBridge) AndBridge.dbg('v','[artCache] '+m); }catch(e){} }
@@ -540,7 +603,9 @@ object PlaybackControls {
                         });
                         return dbPromise;
                     }
-                    function idbTrim(db){
+                    /* Timestamp-trim eviction to `cap` entries (oldest ts first).
+                       Parameterized so the quota-retry path can trim harder. */
+                    function idbTrimTo(db, cap, done){
                         try{
                             var tx=db.transaction('art','readwrite');
                             var st=tx.objectStore('art');
@@ -551,17 +616,29 @@ object PlaybackControls {
                                 if(c){ rows.push({k:c.key, ts:(c.value&&c.value.ts)||0}); try{c.continue();}catch(e){} }
                                 else {
                                     rows.sort(function(a,b){ return a.ts-b.ts; });
-                                    for(var i=0;i+IDB_CAP<rows.length;i++){ try{ st.delete(rows[i].k); }catch(e){} }
+                                    for(var i=0;i+cap<rows.length;i++){ try{ st.delete(rows[i].k); }catch(e){} }
                                 }
                             };
-                        }catch(e){}
+                            tx.oncomplete=function(){ if(done) try{done();}catch(e){} };
+                            tx.onerror=function(){ if(done) try{done();}catch(e){} };
+                        }catch(e){ if(done) try{done();}catch(x){} }
                     }
-                    function idbPut(url, blob){
+                    function idbTrim(db){ idbTrimTo(db, IDB_CAP, null); }
+                    function idbPut(url, blob, retried){
                         idb().then(function(db){
                             if(!db) return;
                             try{
                                 var tx=db.transaction('art','readwrite');
-                                tx.objectStore('art').put({blob:blob, ts:Date.now()}, url);
+                                var st=tx.objectStore('art');
+                                var rq=st.put({blob:blob, ts:Date.now()}, url);
+                                rq.onerror=function(){
+                                    var err=rq.error;
+                                    var quota=err&&(err.name==='QuotaExceededError'||err.code===22);
+                                    if(!retried && quota){
+                                        log('quota exceeded, trimming to half cap and retrying');
+                                        idbTrimTo(db, Math.floor(IDB_CAP/2), function(){ idbPut(url, blob, true); });
+                                    }
+                                };
                                 tx.oncomplete=function(){ idbTrim(db); };
                             }catch(e){}
                         });
@@ -572,17 +649,45 @@ object PlaybackControls {
                             return new Promise(function(res){
                                 try{
                                     var rq=db.transaction('art','readonly').objectStore('art').get(url);
-                                    rq.onsuccess=function(){ var v=rq.result; res(v&&v.blob?v.blob:null); };
+                                    rq.onsuccess=function(){
+                                        var v=rq.result;
+                                        var blob=v&&v.blob?v.blob:null;
+                                        if(blob){
+                                            /* True LRU across sessions: refresh the
+                                               access timestamp on a hit. */
+                                            try{
+                                                var tx2=db.transaction('art','readwrite');
+                                                tx2.objectStore('art').put({blob:blob, ts:Date.now()}, url);
+                                            }catch(e){}
+                                        }
+                                        res(blob);
+                                    };
                                     rq.onerror=function(){ res(null); };
                                 }catch(e){ res(null); }
                             });
                         });
                     }
                     function objUrl(b){ try{ return URL.createObjectURL(b); }catch(e){ return null; } }
+                    /* Fetch a URL into mem+IDB without assigning it to an <img>.
+                       Used to pre-warm the cache for not-yet-rendered artwork. */
+                    function fetchAndStore(url){
+                        if(!url || url.indexOf('blob:')===0 || url.indexOf('data:')===0) return;
+                        if(mem.has(url)) return;
+                        try{
+                            fetch(url,{mode:'cors'}).then(function(r){
+                                if(!r.ok) throw new Error('http '+r.status);
+                                return r.blob();
+                            }).then(function(b){
+                                var ou=objUrl(b);
+                                if(ou){ mem.set(url,ou); idbPut(url,b); log('network cached'); }
+                            }).catch(function(){});
+                        }catch(e){}
+                    }
                     return {
                         size: function(){ return mem.size(); },
                         clear: function(){ mem.clear(); log('cleared'); },
                         has: function(url){ return mem.has(url); },
+                        prime: function(url){ fetchAndStore(url); },
                         /* cache-first artwork assignment; direct src on any failure */
                         loadInto: function(img, url){
                             if(!img || !url) return;
@@ -597,15 +702,7 @@ object PlaybackControls {
                                     if(ou){ mem.set(url,ou); try{ img.src=ou; }catch(e){} log('idb HIT'); }
                                     return;
                                 }
-                                try{
-                                    fetch(url,{mode:'cors'}).then(function(r){
-                                        if(!r.ok) throw new Error('http '+r.status);
-                                        return r.blob();
-                                    }).then(function(b){
-                                        var ou2=objUrl(b);
-                                        if(ou2){ mem.set(url,ou2); idbPut(url,b); log('network cached'); }
-                                    }).catch(function(){});
-                                }catch(e){}
+                                fetchAndStore(url);
                             }).catch(function(){});
                         },
                         _memSet: function(url, v){ mem.set(url,v); },
@@ -613,12 +710,38 @@ object PlaybackControls {
                     };
                 })();
 
+                /* ---------- detail-view DOM snapshot (round 2): instant revisit ----------
+                   The playlist/album detail is the only view rebuilt per visit. After
+                   a successful small render we keep its HTML; on revisit with the
+                   prefetch data still cached, the caller restores innerHTML + rebinds
+                   taps instead of re-rendering. Single snapshot (last-visited),
+                   uri-keyed. Event listeners do not survive innerHTML restore, so
+                   the caller rebinds row taps by index from the cached track data. */
+                Ux.DETAIL_SNAP_MAX_ROWS = 40;
+                Ux._detailSnap = null;
+                Ux.detailSnapSave = function(uri, html, n){
+                    if(!uri || !html || !(n>0) || n>Ux.DETAIL_SNAP_MAX_ROWS) return false;
+                    Ux._detailSnap = {uri:String(uri), html:String(html), n:n|0, ts:Date.now()};
+                    return true;
+                };
+                Ux.detailSnapGet = function(uri){
+                    var s=Ux._detailSnap;
+                    if(!s || s.uri!==String(uri)) return null;
+                    return s.html;
+                };
+                Ux.detailSnapClear = function(){ Ux._detailSnap=null; };
+                Ux.detailSnapStats = function(){
+                    var s=Ux._detailSnap;
+                    return {has:!!s, uri:s?s.uri:null, n:s?s.n:0};
+                };
+
                 /* ---------- memory pressure (B3-JS): called from native onTrimMemory ---------- */
                 function splLog(l,m){ try{ if(window.AndBridge) AndBridge.dbg(l,'[memPressure] '+m); }catch(e){} }
                 function applyModerate(){
                     Ux.setOverscan(2);
                     try{ Ux.artCache.clear(); }catch(e){}
                     try{ Ux.prefetch.cancelAll(); }catch(e){}
+                    try{ Ux.detailSnapClear(); }catch(e){}
                     try{
                         if(!document.getElementById('spl-mem-css')){
                             var s=document.createElement('style'); s.id='spl-mem-css';
