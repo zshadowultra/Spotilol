@@ -3,7 +3,7 @@ package com.project.lol.webview.injections
 // Icons: Solar icon set by 480 Design, CC BY 4.0: https://github.com/480-Design/Solar-Icon-Set
 object CollectionDownload {
     const val CONTENT = """
-            /* Icons: Solar icon set by 480 Design, CC BY 4.0: https://github.com/480-Design/Solar-Icon-Set */
+            /* CollectionDownload icons: Solar set by 480 Design, CC BY 4.0 - https://github.com/480-Design/Solar-Icon-Set */
         (function(){
             if (window.__splColDlInit) return;
             window.__splColDlInit = true;

@@ -3,7 +3,7 @@ package com.project.lol.webview.injections
 // Icons: Solar icon set by 480 Design, CC BY 4.0: https://github.com/480-Design/Solar-Icon-Set
 object DownloadButton {
     const val CONTENT = """
-            /* Icons: Solar icon set by 480 Design, CC BY 4.0: https://github.com/480-Design/Solar-Icon-Set */
+            /* DownloadButton icons: Solar set by 480 Design, CC BY 4.0 - https://github.com/480-Design/Solar-Icon-Set */
             window.splDoDownload = function(){
                 var id = window.splTrackId || window.__curTrackId;
                 if(!id){

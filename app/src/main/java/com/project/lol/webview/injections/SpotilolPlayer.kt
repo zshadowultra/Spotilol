@@ -23,7 +23,7 @@ package com.project.lol.webview.injections
 // Icons: Solar icon set by 480 Design, CC BY 4.0: https://github.com/480-Design/Solar-Icon-Set
 object SpotilolPlayer {
     const val CONTENT = """
-            /* Icons: Solar icon set by 480 Design, CC BY 4.0: https://github.com/480-Design/Solar-Icon-Set */
+            /* SpotilolPlayer icons: Solar set by 480 Design, CC BY 4.0 - https://github.com/480-Design/Solar-Icon-Set */
             window.__splOpt=null;
             window.splPaintPlayIcon=function(playing){
                 var ph=playing

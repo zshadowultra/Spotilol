@@ -23,7 +23,7 @@ package com.project.lol.webview.injections
 // Icons: Solar icon set by 480 Design, CC BY 4.0: https://github.com/480-Design/Solar-Icon-Set
 object SearchOverlay {
     const val CONTENT = """
-            /* Icons: Solar icon set by 480 Design, CC BY 4.0: https://github.com/480-Design/Solar-Icon-Set */
+            /* SearchOverlay icons: Solar set by 480 Design, CC BY 4.0 - https://github.com/480-Design/Solar-Icon-Set */
             (function(){
                 if(window.splSearchInit) return;
                 window.splSearchInit = true;

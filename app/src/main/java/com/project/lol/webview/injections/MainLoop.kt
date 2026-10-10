@@ -3,7 +3,7 @@ package com.project.lol.webview.injections
 // Icons: Solar icon set by 480 Design, CC BY 4.0: https://github.com/480-Design/Solar-Icon-Set
 object MainLoop {
     const val CONTENT = """
-            /* Icons: Solar icon set by 480 Design, CC BY 4.0: https://github.com/480-Design/Solar-Icon-Set */
+            /* MainLoop icons: Solar set by 480 Design, CC BY 4.0 - https://github.com/480-Design/Solar-Icon-Set */
             window.firstFuck = function(){
                 // C1: pfint consolidated into window.__splWarden (PlayerCore.kt).
                 // The warden ticks every 5s and skips when window.__splBg is true,
