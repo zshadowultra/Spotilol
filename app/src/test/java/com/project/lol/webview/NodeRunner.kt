@@ -109,7 +109,7 @@ object NodeRunner {
             require(re.containsMatchIn(body)) { "placeholder missing: $token" }
             // quoteReplacement: escape $ and \ for appendReplacement semantics
             val safe = value.replace("\\", "\\\\").replace("$", "\\$")
-            body = re.replaceFirst(body) { safe }
+            body = re.replaceFirst(body) { _ -> safe }
         }
         sub("__SPLUX__", splux)
         if (Regex("^__PAINT__$", RegexOption.MULTILINE).containsMatchIn(body)) sub("__PAINT__", paintFn)
