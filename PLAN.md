@@ -218,9 +218,12 @@ plugin) — no blocker.
 
 Three parallel workstreams, each on its own branch from `opt/webview-perf`:
 
-1. **Solar icons** (`opt/solar-icons`) — replace the icon set with Solar
-   icons. Status: branch created, work not yet pushed at time of writing;
-   mapping doc `ICON-MAPPING.md` planned. No measurements claimed yet.
+1. **Solar icons** (`opt/solar-icons`) — 99/101 custom-UI inline SVGs
+   replaced with official Solar icons (480 Design, CC BY 4.0), Linear style,
+   sourced from Iconify `@iconify-json/solar`; 2 brand glyphs (Instagram,
+   WhatsApp) deliberately left alone. Mapping + attribution in
+   `ICON-MAPPING.md`. Verified: XML parse 101/101, node --check, 9/9 node
+   drivers, before/after screenshots + 75-icon gallery inspected.
 2. **Pre-render / cache** (`opt/prerender-cache`) — research done
    (`RESEARCH-2.md`, 2026-10-11): `WebViewCompat.prerenderUrlAsync`,
    Speculation Rules, HTTP cache tuning, preconnect/dns-prefetch for the

@@ -55,12 +55,15 @@ const cuiFns = ['skelRecentCard', 'realRecentCard', 'skelReleaseCard', 'realRele
 
 const appjs = fs.readFileSync(path.join(ROOT, 'src/main/assets/custom-ui/app.js'), 'utf8');
 const appSkel = extractFn(appjs, 'function skelSongRow(').replace('function skelSongRow(', 'function appSkelSongRow(');
+const appDetail = ['tryRestoreDetailSnap', 'bindDetailTap']
+  .map(n => extractFn(appjs, 'function ' + n + '(')).join('\n');
+
+// Round 2 (timing-audit): PerfMarks.kt CONTENT for the perf.js driver.
+const perfMarks = contentJs(readKt('PerfMarks.kt'));
 
 const cssM = cui.match(/sk\.textContent=((?:'[^']*'\s*\+\s*)*'[^']*');/);
 if (!cssM) throw new Error('skeleton CSS not found');
 const skelCss = eval(cssM[1]);
-
-const perf = contentJs(readKt('PerfMarks.kt'));
 
 const prelude = fs.readFileSync(path.join(__dirname, 'prelude.js'), 'utf8');
 const driversDir = path.join(__dirname, 'drivers');
@@ -81,7 +84,8 @@ for (const d of drivers) {
   if (/^__PAINT__$/m.test(body)) sub('__PAINT__', paintFn);
   if (/^__CUSTOMUI_FNS__$/m.test(body)) sub('__CUSTOMUI_FNS__', cuiFns);
   if (/^__APPSKELETON__$/m.test(body)) sub('__APPSKELETON__', appSkel);
-  if (/^__PERF__$/m.test(body)) sub('__PERF__', perf);
+  if (/^__APPDETAIL__$/m.test(body)) sub('__APPDETAIL__', appDetail);
+  if (/^__PERF__$/m.test(body)) sub('__PERF__', perfMarks);
   // __SKELCSS__ is used inline as an expression; single unique occurrence.
   body = body.split('__SKELCSS__').join(JSON.stringify(skelCss));
   const tmp = path.join('/tmp', 'uxdrv-' + d);

@@ -242,6 +242,15 @@
           return;
         }
 
+        // Round 2: instant revisit — restore the last-visited detail DOM
+        // snapshot when its data is still in the prefetch LRU. Skips the
+        // skeleton + fetch + re-render entirely.
+        var __snap = tryRestoreDetailSnap(list, uri);
+        if (__snap) {
+          try { setupDetailPager(__snap.next); } catch (e) {}
+          return;
+        }
+
         var url = null;
         if (uri && uri.indexOf('collection') !== -1) {
           url = 'https://api.spotify.com/v1/me/tracks?limit=50';
@@ -307,6 +316,14 @@
           try {
             if (statsEl) statsEl.innerText = tracks.length + (tracks.length === 1 ? ' song' : ' songs');
             renderPlaylistTracks(list, tracks, uri);
+            try { window.__splDetailStats.renders++; } catch (e) {}
+            // Round 2: DOM snapshot for instant revisit — only small,
+            // complete (non-virtualized, no next page) renders qualify.
+            try {
+              if (window.__splUx && window.__splUx.detailSnapSave && !nextUrl) {
+                window.__splUx.detailSnapSave(uri, list.innerHTML, tracks.length);
+              }
+            } catch (e) {}
             setupDetailPager(nextUrl);
             try { if (window.__splPaintEmit) window.__splPaintEmit('screen-playlist-begin', 'screen-playlist-paint'); } catch (e) {}
           } catch (e) {
@@ -416,6 +433,43 @@
       };
     }
 
+    // Binds one detail row's tap: plays the track with the playlist as context.
+    // Factored out so the DOM-snapshot restore path can rebind rows without
+    // rebuilding them (listeners don't survive innerHTML restore).
+    function bindDetailTap(row, t, contextUri) {
+      window.bindTap(row, function() {
+        if (typeof window.playFromUri === 'function') {
+          try { window.playFromUri(t.uri, contextUri); } catch (e) {}
+        }
+      });
+    }
+
+    // Round 2: try to restore the detail view from the DOM snapshot instead
+    // of re-rendering. Returns {next} when the snapshot was used (the caller
+    // then skips skeleton + fetch + render), null otherwise. Requires the
+    // prefetch LRU to still hold the uri's data — the freshness source, the
+    // same data the render path would have used.
+    function tryRestoreDetailSnap(list, uri) {
+      try {
+        window.__splDetailStats = window.__splDetailStats || { renders: 0, restores: 0 };
+        if (!list || !window.__splUx || !window.__splUx.detailSnapGet) return null;
+        if (!window.__splUx.prefetch || !window.__splUx.prefetch.cache.has(uri)) return null;
+        var html = window.__splUx.detailSnapGet(uri);
+        if (!html) return null;
+        var rec = window.__splUx.prefetch.cache.get(uri);
+        var tracks = (rec && rec.tracks) || [];
+        if (!tracks.length || tracks.length > 40) return null;
+        if (window.__splPlaylistVirt) { try { window.__splPlaylistVirt.destroy(); } catch (e) {} window.__splPlaylistVirt = null; }
+        list.innerHTML = html;
+        var rows = list.children || [];
+        for (var i = 0; i < rows.length && i < tracks.length; i++) {
+          bindDetailTap(rows[i], tracks[i], uri);
+        }
+        window.__splDetailStats.restores++;
+        return { next: (rec && rec.next) || null };
+      } catch (e) { return null; }
+    }
+
     // Render track rows into a .song-list using the existing .song-row
     // markup pattern. Row tap plays the track with the playlist as context.
     // C7: lists longer than 40 rows are virtualized (viewport + overscan only).
@@ -452,11 +506,7 @@
       tracks.forEach(function(t) {
         var row = document.createElement('div');
         bindTrackRow(row, t);
-        window.bindTap(row, function() {
-          if (typeof window.playFromUri === 'function') {
-            try { window.playFromUri(t.uri, contextUri); } catch (e) {}
-          }
-        });
+        bindDetailTap(row, t, contextUri);
         list.appendChild(row);
       });
       } finally {
@@ -620,7 +670,9 @@
     // ---- long-press diagnostic on the header avatar ----
     // Hold the avatar 800ms to see the last 10 logged taps, whether
     // switchTab exists, and the last caught error. For device debugging.
-    (function bindAvatarDiagnostic() {
+    // Round 2: the long-press diagnostic is device-debug tooling — keep it off
+    // the synchronous bootstrap critical path; idle-schedule it instead.
+    function bindAvatarDiagnostic() {
       function showDiag() {
         try {
           var taps = (window.__splTapLog || []).slice(-10).map(function(x) {
@@ -659,7 +711,12 @@
         var iv = setInterval(function() { if (attach()) clearInterval(iv); }, 500);
         setTimeout(function() { clearInterval(iv); }, 10000);
       }
-    })();
+    }
+    try {
+      (window.requestIdleCallback || function(f){ return setTimeout(f, 2000); })(function(){
+        try { bindAvatarDiagnostic(); } catch (e) {}
+      });
+    } catch (e) { try { bindAvatarDiagnostic(); } catch (x) {} }
 
     // ---- rebind nav tabs through bindTap ----
     // Replaces inline onclick with touchend+click listeners so tab switches

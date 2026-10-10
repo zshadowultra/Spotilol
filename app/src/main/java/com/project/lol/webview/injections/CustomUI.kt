@@ -136,6 +136,9 @@ object CustomUI {
                         }
 
                         hideSpotifyUi();
+                        // Round 2: one-time preconnect/dns-prefetch hints for the
+                        // fixed artwork + API hosts (i.scdn.co, api.spotify.com).
+                        try{ if(window.__splUx && window.__splUx.netHints) window.__splUx.netHints(); }catch(e){}
                         buildBridge();
 
                         var root = document.createElement('div');
@@ -456,6 +459,28 @@ object CustomUI {
                                         // ---- Real sections (replaces fakes) ----
                                         replaceFakeSections(lib);
                                         if (window.__splPerf) window.__splPerf.emitSince('screen-home-begin','screen-home-content');
+
+                                        // Round 2: pre-warm the artwork cache on idle for the
+                                        // library screen — the same playlist/album/artist art
+                                        // recurs across Home/Library, so the first Library
+                                        // visit finds it already cached. One-shot per boot.
+                                        try{
+                                            if(window.__splUx && window.__splUx.artCache && window.__splUx.artCache.prime && !window.__splHomeWarmed){
+                                                window.__splHomeWarmed = true;
+                                                var warmUrls=[], warmSeen={};
+                                                function warmPush(u){ if(u && !warmSeen[u] && warmUrls.length<12){ warmSeen[u]=1; warmUrls.push(u); } }
+                                                (lib.playlists||[]).forEach(function(p){ warmPush(p.image); });
+                                                (lib.albums||[]).forEach(function(a){ warmPush(a.image); });
+                                                (lib.artists||[]).forEach(function(a){ warmPush(a.image); });
+                                                if(warmUrls.length){
+                                                    window.__splUx.idle(function(){
+                                                        for(var wi=0;wi<warmUrls.length;wi++){
+                                                            try{ window.__splUx.artCache.prime(warmUrls[wi]); }catch(e){}
+                                                        }
+                                                    });
+                                                }
+                                            }
+                                        }catch(e){}
                                     } catch (e) { console.error('[CustomUI] home populate failed', e); }
                                 }).catch(function(e){ try{ var g=document.getElementById('homeGrid'); if(g) clearSkel(g); }catch(x){} });
                             } catch (e) {}
