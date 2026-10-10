@@ -200,8 +200,8 @@ class MainActivity : ComponentActivity() {
             override fun resume() { webView?.onResume() }
         },
         globalOps = object : WebViewPauseCoordinator.GlobalOps {
-            override fun pauseTimers() = WebView.pauseTimers()
-            override fun resumeTimers() = WebView.resumeTimers()
+            override fun pauseTimers() = android.webkit.WebView.pauseTimers()
+            override fun resumeTimers() = android.webkit.WebView.resumeTimers()
         }
     )
 
