@@ -171,6 +171,11 @@ class SpotifyWebViewClient(
         // Each payload runs in its own try/catch, matching the old behaviour where each
         // was a separate evaluateJavascript call and one failure didn't stop the rest.
         val parts = buildList {
+            // Timing audit (round 2): the __splPerf helper must exist before
+            // any part runs, so it is the first part; the end part emits the
+            // document-start eval duration to logcat (tag spotilol.perf).
+            add(PerfMarks.CONTENT)
+            add(PerfMarks.DOCSTART_BEGIN)
             add("window.__splShowScrollbar=$showScrollbar;")
             add("window.__spotilolUseProxy=$useProxy;")
             add("window.__splPowerSavePref=$powerSave;")
@@ -186,6 +191,7 @@ class SpotifyWebViewClient(
             add(SettingsFix.CONTENT)
             add(VideoPark.CONTENT)
             add(CookieBypass.CONTENT)
+            add(PerfMarks.DOCSTART_END)
         }
         return parts.joinToString("\n") { "try{\n$it\n}catch(e){}" }
     }
@@ -665,11 +671,12 @@ internal fun injectSplitPayload(
     deferredJs: String,
     playerMode: String
 ) {
-    if (playerMode == "original") {
-        evaluate(coreJs + "\n" + themeJs + "\n" + NP_SHOW_STYLE_JS)
-    } else {
-        evaluate(coreJs + "\n" + themeJs)
-    }
+    // Timing audit (round 2): core-chunk eval duration, one line on logcat
+    // (tag spotilol.perf). Only the timing wrapper changes — the call graph
+    // and the core-before-deferred order are untouched.
+    val coreEval = (if (playerMode == "original") coreJs + "\n" + themeJs + "\n" + NP_SHOW_STYLE_JS
+    else coreJs + "\n" + themeJs)
+    evaluate(PerfMarks.CORE_BEGIN + "\n" + coreEval + "\n" + PerfMarks.CORE_END)
     // Deferred chunks (downloads UI, PlaylistSort, SearchOverlay) run on
     // requestIdleCallback, setTimeout(3000) fallback.
     evaluate(buildDeferredSchedulerJs(deferredJs))
@@ -731,7 +738,10 @@ internal fun buildDeferredSchedulerJs(deferredJs: String): String {
                 var run = function(){
                     if (window.__splDeferredRan) return;
                     window.__splDeferredRan = true;
+                    // Timing audit (round 2): deferred-chunk eval duration.
+                    try{ if(window.__splPerf) window.__splPerf.mark('deferred-begin'); }catch(e){}
                     try { (0,eval)(src); } catch(e) {}
+                    try{ if(window.__splPerf) window.__splPerf.emitSince('deferred-begin','deferred-eval'); }catch(e){}
                     src = null;
                 };
                 if (window.requestIdleCallback) {

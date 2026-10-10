@@ -326,6 +326,8 @@ object CustomUI {
                                 if(typeof window.fetchAllLibrary!=='function'||typeof window.parseLibrary!=='function') return;
                                 var list=document.querySelector('#tabLibrary .song-list');
                                 if(!list||list.getAttribute('data-spl-real')==='1') return;
+                                // Timing audit (round 2): library screen-open -> real content painted.
+                                if(window.__splPerf) window.__splPerf.mark('screen-library-begin');
                                 list.setAttribute('data-spl-real','1');
                                 list.innerHTML='';
                                 for(var i=0;i<8;i++) list.appendChild(skelSongRow());
@@ -350,6 +352,7 @@ object CustomUI {
                                         for(var a=0;a<als.length&&n<60;a++){ var al=als[a]; push(al.id||'',al.name||'Album','Album'+(((al.artists||[]).length)?' \u00b7 '+al.artists.join(', '):''),al.image||''); }
                                         var ars=lib.artists||[];
                                         for(var r=0;r<ars.length&&n<60;r++){ var ar2=ars[r]; push(ar2.id||'',ar2.name||'Artist','Artist',ar2.image||''); }
+                                        if(window.__splPerf) window.__splPerf.emitSince('screen-library-begin','screen-library-content');
                                     }catch(e){ clearSkel(list); }
                                 }).catch(function(){ clearSkel(list); });
                             }catch(e){}
@@ -421,6 +424,8 @@ object CustomUI {
                             try {
                                 if (typeof window.fetchAllLibrary !== 'function') return;
                                 if (typeof window.parseLibrary !== 'function') return;
+                                // Timing audit (round 2): home screen-open -> real content painted.
+                                if (window.__splPerf) window.__splPerf.mark('screen-home-begin');
                                 showHomeSkeletons();
                                 window.fetchAllLibrary().then(function(items) {
                                     try {
@@ -450,6 +455,7 @@ object CustomUI {
 
                                         // ---- Real sections (replaces fakes) ----
                                         replaceFakeSections(lib);
+                                        if (window.__splPerf) window.__splPerf.emitSince('screen-home-begin','screen-home-content');
                                     } catch (e) { console.error('[CustomUI] home populate failed', e); }
                                 }).catch(function(e){ try{ var g=document.getElementById('homeGrid'); if(g) clearSkel(g); }catch(x){} });
                             } catch (e) {}

@@ -97,6 +97,8 @@ object NodeRunner {
         val appSkel = extractFn(appjs, "function skelSongRow(")
             .replace("function skelSongRow(", "function appSkelSongRow(")
 
+        val perf = contentJs("PerfMarks.kt")
+
         val cssM = Regex("""sk\.textContent=((?:'[^']*'\s*\+\s*)*'[^']*');""").find(cui)
             ?: throw IllegalStateException("skeleton CSS not found")
         val cssParts = Regex("'((?:[^'\\\\]|\\\\.)*)'").findAll(cssM.groupValues[1])
@@ -111,10 +113,11 @@ object NodeRunner {
             // group references / escapes in appendReplacement semantics.
             body = re.replaceFirst(body, java.util.regex.Matcher.quoteReplacement(value))
         }
-        sub("__SPLUX__", splux)
+        if (Regex("^__SPLUX__$", RegexOption.MULTILINE).containsMatchIn(body)) sub("__SPLUX__", splux)
         if (Regex("^__PAINT__$", RegexOption.MULTILINE).containsMatchIn(body)) sub("__PAINT__", paintFn)
         if (Regex("^__CUSTOMUI_FNS__$", RegexOption.MULTILINE).containsMatchIn(body)) sub("__CUSTOMUI_FNS__", cuiFns)
         if (Regex("^__APPSKELETON__$", RegexOption.MULTILINE).containsMatchIn(body)) sub("__APPSKELETON__", appSkel)
+        if (Regex("^__PERF__$", RegexOption.MULTILINE).containsMatchIn(body)) sub("__PERF__", perf)
         body = body.replace("__SKELCSS__", jsQuote(skelCss))
         return File(nodeDir, "prelude.js").readText() + "\n" + body
     }

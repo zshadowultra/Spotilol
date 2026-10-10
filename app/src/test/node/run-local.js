@@ -60,6 +60,8 @@ const cssM = cui.match(/sk\.textContent=((?:'[^']*'\s*\+\s*)*'[^']*');/);
 if (!cssM) throw new Error('skeleton CSS not found');
 const skelCss = eval(cssM[1]);
 
+const perf = contentJs(readKt('PerfMarks.kt'));
+
 const prelude = fs.readFileSync(path.join(__dirname, 'prelude.js'), 'utf8');
 const driversDir = path.join(__dirname, 'drivers');
 const only = process.argv[2];
@@ -75,10 +77,11 @@ for (const d of drivers) {
     if (!re.test(body)) throw new Error('placeholder missing: ' + token);
     body = body.replace(re, () => val);
   };
-  sub('__SPLUX__', splux);
+  if (/^__SPLUX__$/m.test(body)) sub('__SPLUX__', splux);
   if (/^__PAINT__$/m.test(body)) sub('__PAINT__', paintFn);
   if (/^__CUSTOMUI_FNS__$/m.test(body)) sub('__CUSTOMUI_FNS__', cuiFns);
   if (/^__APPSKELETON__$/m.test(body)) sub('__APPSKELETON__', appSkel);
+  if (/^__PERF__$/m.test(body)) sub('__PERF__', perf);
   // __SKELCSS__ is used inline as an expression; single unique occurrence.
   body = body.split('__SKELCSS__').join(JSON.stringify(skelCss));
   const tmp = path.join('/tmp', 'uxdrv-' + d);

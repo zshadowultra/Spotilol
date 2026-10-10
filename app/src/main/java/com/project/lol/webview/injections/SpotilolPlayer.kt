@@ -114,12 +114,25 @@ object SpotilolPlayer {
                 }
 
                 function splOptPlay(){
+                    // Timing audit (round 2): tap -> icon-paint delta. t0 is the
+                    // tap-handler entry; the rAF callback runs right before the
+                    // next paint — the closest cheap proxy for "icon is on
+                    // screen". Emitted to logcat (tag spotilol.perf).
+                    var __p0=(window.__splPerf?window.__splPerf.now():-1);
                     var st=window.splIsPlaying();
                     var target=(st===null)?null:!st;
                     var ok=window.actPlayPause(target);
                     if(target!==null&&ok!==false&&window.__splUx){
                         window.__splOpt=window.__splUx.optBeginPlay(target,Date.now());
                         window.splPaintPlayIcon(target);
+                        if(__p0>=0&&window.__splPerf&&window.requestAnimationFrame){
+                            try{
+                                var __prf=window.__splPerf;
+                                window.requestAnimationFrame(function(){
+                                    try{ __prf.emit('tap-play-icon',__prf.now()-__p0); }catch(e){}
+                                });
+                            }catch(e){}
+                        }
                     }
                 }
                 function splOptSkip(ok){

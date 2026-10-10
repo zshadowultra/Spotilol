@@ -104,6 +104,19 @@ class SpotifyBridge(activityRef: WeakReference<Activity>) {
         Logger.js(level, msg)
     }
 
+    /**
+     * Timing instrumentation bridge: injected JS calls
+     * `AndBridge.perfMark('[spl-perf] <event> <n>ms')`.
+     * Unlike [dbg] this is NOT gated by the Logging pref — measurement must
+     * work with the in-app log viewer off; the lines are fixed-format
+     * numerics (see Logger.perf). Reaches logcat as `I/spotilol.perf`.
+     */
+    @JavascriptInterface
+    fun perfMark(msg: String?) {
+        val m = msg ?: return
+        Logger.perf(m)
+    }
+
     @JavascriptInterface
     fun clearDebugLog() {
         Logger.clear()

@@ -51,4 +51,10 @@ class UxPerfTest {
         val out = NodeRunner.runDriver("mempressure.js")
         assertTrue(out.contains("PASS mempressure"))
     }
+
+    @Test
+    fun perfMarks_fireInOrderWithNonNegativeDeltas() {
+        val out = NodeRunner.runDriver("perf.js")
+        assertTrue(out.contains("PASS perf"))
+    }
 }

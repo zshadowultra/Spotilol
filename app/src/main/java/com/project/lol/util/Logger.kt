@@ -168,4 +168,20 @@ object Logger {
         }
         log(mapped.first, mapped.second, msg)
     }
+
+    /**
+     * Timing marks from the perf-audit instrumentation
+     * (`window.__splPerf` in injected JS → `SpotifyBridge.perfMark`).
+     *
+     * Written UNCONDITIONALLY to logcat as `I/spotilol.perf` — the marks must
+     * be capturable even when the in-app log viewer (the `Logging` pref) is
+     * off, and they never touch the 2000-entry ring buffer (no buffer churn
+     * from measurement). The lines are fixed-format `name <n>ms` numerics —
+     * no user content — so bypassing the Logging gate here is safe.
+     *
+     * Capture: `adb logcat -s spotilol.perf:I`
+     */
+    fun perf(message: String) {
+        android.util.Log.i("spotilol.perf", message.take(MAX_MESSAGE))
+    }
 }

@@ -1,4 +1,8 @@
 // Seeded from window.__bridge (mock in the VM, real seams in the app).
+    // ---- timing instrumentation (user perf audit, round 2) ----
+    // window.__splPerf is defined by the document-start payload; every use
+    // below is guarded so this file also runs without it (node drivers).
+    try { if (window.__splPerf) window.__splPerf.mark('customui-js-begin'); } catch (e) {}
     // Falls back to the authored demo values when the bridge is absent.
     const __b = (typeof window !== 'undefined' && window.__bridge) || {};
     const __bt = __b.track || {};
@@ -37,6 +41,21 @@
       } catch (e) {}
     }
     window.__splLogTap = __splLogTap;
+
+    // ---- timing: screen-open -> content painted ----
+    // Marks the open at the tap/event; emits when the content DOM is built,
+    // via rAF (fires right before the next paint — the closest cheap proxy
+    // for "content is on screen"). Lines go to logcat (tag spotilol.perf).
+    function __splPaintEmit(beginMark, label) {
+      try {
+        if (window.__splPerf && window.requestAnimationFrame) {
+          window.requestAnimationFrame(function() {
+            try { window.__splPerf.emitSince(beginMark, label); } catch (e) {}
+          });
+        }
+      } catch (e) {}
+    }
+    window.__splPaintEmit = __splPaintEmit;
 
     // ---- resilient tap binding ----
     // Some Android WebViews / host pages suppress click synthesis (e.g. a
@@ -110,6 +129,7 @@
     function switchTab(tabName, element) {
       try {
         __splLogTap('switchTab:' + tabName);
+        try { if (window.__splPerf) window.__splPerf.mark('screen-' + tabName + '-begin'); } catch (e) {}
         document.querySelectorAll('.tab-view').forEach(view => view.classList.remove('active'));
         document.querySelectorAll('.nav-tab').forEach(btn => btn.classList.remove('active'));
         document.getElementById('playlistLiked').classList.remove('active');
@@ -128,6 +148,7 @@
         
         element.classList.add('active');
         document.getElementById('mainScrollArea').scrollTo({ top: 0, behavior: 'instant' });
+        try { if (window.__splPaintEmit) window.__splPaintEmit('screen-' + tabName + '-begin', 'screen-' + tabName + '-paint'); } catch (e) {}
       } catch (e) {
         window.__splLastError = String((e && e.message) || e);
         try { showToast('Error: ' + ((e && e.message) || e)); } catch (x) {}
@@ -179,6 +200,7 @@
     function openPlaylistDetail(uri, name, image) {
       try {
         __splLogTap('openPlaylistDetail:' + (name || uri || ''));
+        try { if (window.__splPerf) window.__splPerf.mark('screen-playlist-begin'); } catch (e) {}
         var section = document.getElementById('playlistLiked');
         if (!section) { showToast('View not available'); return; }
 
@@ -286,6 +308,7 @@
             if (statsEl) statsEl.innerText = tracks.length + (tracks.length === 1 ? ' song' : ' songs');
             renderPlaylistTracks(list, tracks, uri);
             setupDetailPager(nextUrl);
+            try { if (window.__splPaintEmit) window.__splPaintEmit('screen-playlist-begin', 'screen-playlist-paint'); } catch (e) {}
           } catch (e) {
             window.__splLastError = String((e && e.message) || e);
           }
@@ -397,6 +420,11 @@
     // markup pattern. Row tap plays the track with the playlist as context.
     // C7: lists longer than 40 rows are virtualized (viewport + overscan only).
     function renderPlaylistTracks(list, tracks, contextUri) {
+      // Timing audit (round 2): render duration with row count + whether the
+      // virtualized path ran. The finally keeps the emit on early returns too.
+      var __t0 = (window.__splPerf ? window.__splPerf.now() : -1);
+      var __n = (tracks && tracks.length) || 0;
+      try {
       if (!list) return;
       if (window.__splPlaylistVirt) { try { window.__splPlaylistVirt.destroy(); } catch (e) {} window.__splPlaylistVirt = null; }
       list.innerHTML = '';
@@ -431,6 +459,14 @@
         });
         list.appendChild(row);
       });
+      } finally {
+        try {
+          if (__t0 >= 0 && window.__splPerf) {
+            var __v = window.__splPlaylistVirt ? 1 : 0;
+            window.__splPerf.emit('renderPlaylistTracks rows=' + __n + ' virt=' + __v, window.__splPerf.now() - __t0);
+          }
+        } catch (e) {}
+      }
     }
     window.renderPlaylistTracks = renderPlaylistTracks;
 
@@ -640,3 +676,14 @@
         });
       } catch (e) {}
     })();
+
+    // ---- timing: custom-ui first paint (user perf audit, round 2) ----
+    // The rAF fires right before the browser's first paint of this script's
+    // DOM work — the closest cheap proxy for "custom UI is on screen".
+    try {
+      if (window.__splPerf && window.requestAnimationFrame) {
+        window.requestAnimationFrame(function() {
+          try { window.__splPerf.emitSince('customui-js-begin', 'customui-first-paint'); } catch (e) {}
+        });
+      }
+    } catch (e) {}
