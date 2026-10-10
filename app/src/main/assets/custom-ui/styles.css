@@ -1440,3 +1440,9 @@
         height: var(--sp-release-card-size-wide);
       }
     }
+
+/* ---- C7 virtualization assist: rows are absolutely positioned by the
+   virtualizer inside .spl-virt-spacer (total height preserved, so scroll
+   position never jumps); content-visibility keeps offscreen rows cheap. ---- */
+.spl-virt-spacer{position:relative;width:100%;}
+.spl-virt-row{content-visibility:auto;contain-intrinsic-size:auto 64px;}

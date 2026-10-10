@@ -203,20 +203,14 @@
           };
         }
 
-        // Clear the song list and show a loading row
+        // Clear the song list and show skeleton rows (D5: exact .song-row geometry)
         var list = section.querySelector('.song-list');
+        if (window.__splDetailIO) { try { window.__splDetailIO.disconnect(); } catch (e) {} window.__splDetailIO = null; }
+        if (window.__splDetailAbort) { try { window.__splDetailAbort.abort(); } catch (e) {} window.__splDetailAbort = null; }
+        if (window.__splUx) { try { window.__splUx.prefetch.cancelAll(); } catch (e) {} }
         if (list) {
           list.innerHTML = '';
-          var loading = document.createElement('div');
-          loading.className = 'song-row';
-          var linfo = document.createElement('div');
-          linfo.className = 'song-info';
-          var lname = document.createElement('div');
-          lname.className = 'song-name';
-          lname.innerText = 'Loading...';
-          linfo.appendChild(lname);
-          loading.appendChild(linfo);
-          list.appendChild(loading);
+          for (var ski = 0; ski < 8; ski++) list.appendChild(skelSongRow());
         }
 
         // Auth guard
@@ -241,26 +235,87 @@
             : 'https://api.spotify.com/v1/playlists/' + m[2] + '/tracks?limit=50&fields=items(track(uri,name,artists(name),album(images)))';
         }
 
-        fetch(url, { headers: { 'Authorization': window.spotAuthToken } })
-          .then(function(r) { return r.json(); })
-          .then(function(data) {
-            try {
-              var tracks = [];
-              (data.items || []).forEach(function(it) {
-                var t = it.track || it;
-                if (t && t.uri) tracks.push(t);
-              });
-              if (statsEl) statsEl.innerText = tracks.length + (tracks.length === 1 ? ' song' : ' songs');
-              renderPlaylistTracks(list, tracks, uri);
-            } catch (e) {
-              window.__splLastError = String((e && e.message) || e);
-            }
-          })
-          .catch(function(e) {
-            window.__splLastError = String((e && e.message) || e);
-            if (list) list.innerHTML = '';
-            showToast("Couldn't load tracks");
+        // C6: infinite scroll via IntersectionObserver (no scroll handlers).
+        // The sentinel sits after the list; rootMargin prefetches before the end.
+        function setupDetailPager(nextUrl) {
+          if (!nextUrl || !window.IntersectionObserver || !list) return;
+          var sentinel = document.createElement('div');
+          sentinel.style.cssText = 'height:1px;';
+          list.appendChild(sentinel);
+          var loading = false;
+          var io = new IntersectionObserver(function(entries) {
+            if (!entries[0].isIntersecting || loading) return;
+            loading = true;
+            var u = nextUrl; nextUrl = null;
+            fetch(u, { headers: { 'Authorization': window.spotAuthToken } })
+              .then(function(r) { if (!r.ok) throw new Error('http ' + r.status); return r.json(); })
+              .then(function(data) {
+                var more = [];
+                (data.items || []).forEach(function(it) { var t = it.track || it; if (t && t.uri) more.push(t); });
+                nextUrl = (data && data.next) || null;
+                loading = false;
+                if (!more.length) { io.disconnect(); if (sentinel.parentNode) sentinel.parentNode.removeChild(sentinel); return; }
+                if (window.__splPlaylistVirt) window.__splPlaylistVirt.appendItems(more);
+                else {
+                  more.forEach(function(t) {
+                    var row = document.createElement('div');
+                    bindTrackRow(row, t);
+                    window.bindTap(row, function() {
+                      if (typeof window.playFromUri === 'function') { try { window.playFromUri(t.uri, uri); } catch (e) {} }
+                    });
+                    list.insertBefore(row, sentinel);
+                  });
+                }
+                if (!nextUrl) { io.disconnect(); if (sentinel.parentNode) sentinel.parentNode.removeChild(sentinel); }
+              })
+              .catch(function() { loading = false; });
+          }, { root: document.getElementById('mainScrollArea'), rootMargin: '400px' });
+          io.observe(sentinel);
+          window.__splDetailIO = io;
+        }
+        function tracksFrom(data) {
+          var tracks = [];
+          (data.items || []).forEach(function(it) {
+            var t = it.track || it;
+            if (t && t.uri) tracks.push(t);
           });
+          return tracks;
+        }
+        function renderDetail(tracks, nextUrl) {
+          try {
+            if (statsEl) statsEl.innerText = tracks.length + (tracks.length === 1 ? ' song' : ' songs');
+            renderPlaylistTracks(list, tracks, uri);
+            setupDetailPager(nextUrl);
+          } catch (e) {
+            window.__splLastError = String((e && e.message) || e);
+          }
+        }
+        function failDetail(e) {
+          window.__splLastError = String((e && e.message) || e);
+          if (list) list.innerHTML = '';
+          showToast("Couldn't load tracks");
+        }
+        var detailAbort = null;
+        try { detailAbort = new AbortController(); window.__splDetailAbort = detailAbort; } catch (e) {}
+        // D3: serve from the dwell-prefetch LRU on a hit (0 ms network).
+        if (window.__splUx && window.__splUx.prefetch.cache.has(uri)) {
+          var rec = window.__splUx.prefetch.cache.get(uri);
+          renderDetail(rec.tracks, rec.next);
+        } else {
+          var fetchOpts = { headers: { 'Authorization': window.spotAuthToken } };
+          if (detailAbort) fetchOpts.signal = detailAbort.signal;
+          fetch(url, fetchOpts)
+            .then(function(r) { if (!r.ok) throw new Error('http ' + r.status); return r.json(); })
+            .then(function(data) {
+              var rec2 = { tracks: tracksFrom(data), next: (data && data.next) || null, ts: Date.now() };
+              try { if (window.__splUx) window.__splUx.prefetch.cache.set(uri, rec2); } catch (e) {}
+              renderDetail(rec2.tracks, rec2.next);
+            })
+            .catch(function(e) {
+              if (e && e.name === 'AbortError') return;
+              failDetail(e);
+            });
+        }
       } catch (e) {
         window.__splLastError = String((e && e.message) || e);
         try { showToast('Error: ' + ((e && e.message) || e)); } catch (x) {}
@@ -270,8 +325,80 @@
 
     // Render track rows into a .song-list using the existing .song-row
     // markup pattern. Row tap plays the track with the playlist as context.
+    // D5: skeleton row with the exact .song-row box geometry (same classes;
+    // the .spl-skel shimmer is a ::after overlay that never changes layout).
+    function skelSongRow() {
+      var row = document.createElement('div');
+      row.className = 'song-row';
+      row.style.pointerEvents = 'none';
+      var a = document.createElement('div');
+      a.className = 'song-art spl-skel';
+      row.appendChild(a);
+      var info = document.createElement('div');
+      info.className = 'song-info';
+      var nm = document.createElement('div');
+      nm.className = 'song-name spl-skel';
+      nm.innerText = '\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0';
+      info.appendChild(nm);
+      var sb = document.createElement('div');
+      sb.className = 'song-subtitle spl-skel';
+      sb.innerText = '\u00a0\u00a0\u00a0';
+      info.appendChild(sb);
+      row.appendChild(info);
+      return row;
+    }
+
+    // Binds one recycled row node to a track (C7: must fully rebind — the
+    // virtualizer reuses these nodes while scrolling).
+    function bindTrackRow(row, t) {
+      row.className = 'song-row';
+      row.innerHTML = '';
+      var art = document.createElement('img');
+      art.className = 'song-art';
+      var imgs = (t.album && t.album.images) || [];
+      var imgUrl = imgs.length ? imgs[imgs.length - 1].url : '';
+      if (imgUrl) {
+        if (window.__splUx) window.__splUx.artCache.loadInto(art, imgUrl);
+        else { art.setAttribute('loading', 'lazy'); art.setAttribute('decoding', 'async'); art.src = imgUrl; }
+      }
+      art.alt = t.name || '';
+      row.appendChild(art);
+      var info = document.createElement('div');
+      info.className = 'song-info';
+      var nameEl = document.createElement('div');
+      nameEl.className = 'song-name';
+      nameEl.innerText = t.name || 'Unknown';
+      info.appendChild(nameEl);
+      var sub = document.createElement('div');
+      sub.className = 'song-subtitle';
+      var subSpan = document.createElement('span');
+      var artists = (t.artists || []).map(function(a) { return a && a.name; }).filter(Boolean).join(', ');
+      subSpan.innerText = artists;
+      sub.appendChild(subSpan);
+      info.appendChild(sub);
+      row.appendChild(info);
+    }
+    // Tap wiring that survives node recycling: bindTap runs once per pooled
+    // node (its __splTapBound guard ignores re-binds); the per-item action is
+    // swapped via __splTapFn on every recycle. Click behavior is unchanged.
+    function wireTrackTap(el, t, contextUri) {
+      if (!el.__splTapWired) {
+        el.__splTapWired = true;
+        window.bindTap(el, function() { var f = el.__splTapFn; if (f) { try { f(); } catch (e) {} } });
+      }
+      el.__splTapFn = function() {
+        if (typeof window.playFromUri === 'function') {
+          try { window.playFromUri(t.uri, contextUri); } catch (e) {}
+        }
+      };
+    }
+
+    // Render track rows into a .song-list using the existing .song-row
+    // markup pattern. Row tap plays the track with the playlist as context.
+    // C7: lists longer than 40 rows are virtualized (viewport + overscan only).
     function renderPlaylistTracks(list, tracks, contextUri) {
       if (!list) return;
+      if (window.__splPlaylistVirt) { try { window.__splPlaylistVirt.destroy(); } catch (e) {} window.__splPlaylistVirt = null; }
       list.innerHTML = '';
       if (!tracks || !tracks.length) {
         var empty = document.createElement('div');
@@ -286,30 +413,17 @@
         list.appendChild(empty);
         return;
       }
+      if (window.__splUx && tracks.length > 40) {
+        var scroller = document.getElementById('mainScrollArea') || list;
+        window.__splPlaylistVirt = window.__splUx.virtualize(list, scroller, tracks.slice(), function(el, t) {
+          bindTrackRow(el, t);
+          wireTrackTap(el, t, contextUri);
+        }, { rowH: 0 });
+        return;
+      }
       tracks.forEach(function(t) {
         var row = document.createElement('div');
-        row.className = 'song-row';
-        var art = document.createElement('img');
-        art.className = 'song-art';
-        var imgs = (t.album && t.album.images) || [];
-        var imgUrl = imgs.length ? imgs[imgs.length - 1].url : '';
-        if (imgUrl) art.src = imgUrl;
-        art.alt = t.name || '';
-        row.appendChild(art);
-        var info = document.createElement('div');
-        info.className = 'song-info';
-        var nameEl = document.createElement('div');
-        nameEl.className = 'song-name';
-        nameEl.innerText = t.name || 'Unknown';
-        info.appendChild(nameEl);
-        var sub = document.createElement('div');
-        sub.className = 'song-subtitle';
-        var subSpan = document.createElement('span');
-        var artists = (t.artists || []).map(function(a) { return a && a.name; }).filter(Boolean).join(', ');
-        subSpan.innerText = artists;
-        sub.appendChild(subSpan);
-        info.appendChild(sub);
-        row.appendChild(info);
+        bindTrackRow(row, t);
         window.bindTap(row, function() {
           if (typeof window.playFromUri === 'function') {
             try { window.playFromUri(t.uri, contextUri); } catch (e) {}

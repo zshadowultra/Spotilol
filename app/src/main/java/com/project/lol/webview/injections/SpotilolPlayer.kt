@@ -22,6 +22,15 @@ package com.project.lol.webview.injections
 
 object SpotilolPlayer {
     const val CONTENT = """
+            window.__splOpt=null;
+            window.splPaintPlayIcon=function(playing){
+                var ph=playing
+                    ?'<svg viewBox="0 0 16 16"><path fill="currentColor" d="M2.7 1a.7.7 0 0 0-.7.7v12.6a.7.7 0 0 0 .7.7h2.6a.7.7 0 0 0 .7-.7V1.7a.7.7 0 0 0-.7-.7zm8 0a.7.7 0 0 0-.7.7v12.6a.7.7 0 0 0 .7.7h2.6a.7.7 0 0 0 .7-.7V1.7a.7.7 0 0 0-.7-.7z"/></svg>'
+                    :'<svg viewBox="0 0 16 16"><path fill="currentColor" d="M3 1.713a.7.7 0 0 1 1.05-.607l10.89 6.288a.7.7 0 0 1 0 1.212L4.05 14.894A.7.7 0 0 1 3 14.288z"/></svg>';
+                var pp=document.getElementById('spl-play'),ppm=document.getElementById('spl-play-mini');
+                if(pp){ pp.innerHTML=ph; pp.__splPh=ph; }
+                if(ppm){ ppm.innerHTML=ph; ppm.__splPh=ph; }
+            };
             window.initSpotilolPlayer=function(){
                 if(document.getElementById('spotilolPlayerControls')) return;
                 var npb=document.querySelector('aside[data-testid="now-playing-bar"]');
@@ -104,12 +113,30 @@ object SpotilolPlayer {
                     var t=document.head||document.documentElement;if(t)t.appendChild(sst);
                 }
 
-                document.getElementById('spl-prev').onclick=function(){actSkipBack()};
-                document.getElementById('spl-next').onclick=function(){actSkipForward()};
-                document.getElementById('spl-play').onclick=function(){var st=window.splIsPlaying();actPlayPause(st===null?null:!st)};
-                document.getElementById('spl-prev-mini').onclick=function(){actSkipBack()};
-                document.getElementById('spl-next-mini').onclick=function(){actSkipForward()};
-                document.getElementById('spl-play-mini').onclick=function(){var st=window.splIsPlaying();actPlayPause(st===null?null:!st)};
+                function splOptPlay(){
+                    var st=window.splIsPlaying();
+                    var target=(st===null)?null:!st;
+                    var ok=window.actPlayPause(target);
+                    if(target!==null&&ok!==false&&window.__splUx){
+                        window.__splOpt=window.__splUx.optBeginPlay(target,Date.now());
+                        window.splPaintPlayIcon(target);
+                    }
+                }
+                function splOptSkip(ok){
+                    if(ok===false||!window.__splUx) return;
+                    var tk=document.getElementById('spl-track');
+                    window.__splOpt=window.__splUx.optBeginSkip(tk?tk.textContent:'',Date.now());
+                    var fl=document.getElementById('spl-fill'),fe=document.getElementById('spl-fill-edge'),ps=document.getElementById('spl-pos');
+                    if(fl) fl.style.transform='scaleX(0)';
+                    if(fe) fe.style.transform='scaleX(0)';
+                    if(ps) ps.textContent='0:00';
+                }
+                document.getElementById('spl-prev').onclick=function(){splOptSkip(window.actSkipBack())};
+                document.getElementById('spl-next').onclick=function(){splOptSkip(window.actSkipForward())};
+                document.getElementById('spl-play').onclick=function(){splOptPlay()};
+                document.getElementById('spl-prev-mini').onclick=function(){splOptSkip(window.actSkipBack())};
+                document.getElementById('spl-next-mini').onclick=function(){splOptSkip(window.actSkipForward())};
+                document.getElementById('spl-play-mini').onclick=function(){splOptPlay()};
                 document.getElementById('spl-shuffle').onclick=function(){var sb=splFindShuffle();if(sb&&sb.getAttribute('aria-disabled')!=='true')sb.click()};
                 document.getElementById('spl-repeat').onclick=function(){actRepeat()};
                 document.getElementById('spl-lyrics').onclick=function(){if(this.classList.contains('spl-disabled'))return;if(typeof closeNowPlay==='function') closeNowPlay();var lb=document.querySelector('button[data-testid=lyrics-button]');if(lb&&!lb.disabled)lb.click()};
@@ -392,7 +419,18 @@ object SpotilolPlayer {
                         if(ar&&artistEl&&tk.textContent!=='No track') ar.textContent=artistEl.textContent||'';
 
                         var rg=document.querySelector('[data-testid="playback-progressbar"] input[type=range]');
-                        if(pp||ppm){
+                        var __optHold=null;
+                        if(window.__splUx&&window.__splOpt){
+                            var __opt=window.__splOpt;
+                            var __rec=window.__splUx.optReconcile(__opt,{playing:window.splIsPlayingSticky(),title:(tk&&tk.textContent)||''},Date.now());
+                            if(__rec.action==='confirm'){ window.__splOpt=null; }
+                            else if(__rec.action==='revert'){
+                                var __k=__opt.kind; window.__splOpt=null;
+                                if(typeof window.splToast==='function') window.splToast(__k==='play'?'Could not change playback':'Skip failed');
+                            }
+                            else if(__rec.action==='keep'){ __optHold=__opt.kind; }
+                        }
+                        if((pp||ppm)&&__optHold!=='play'){
                             var isPlaying=window.splIsPlayingSticky();
                             var ph=isPlaying
                                 ?'<svg viewBox="0 0 16 16"><path fill="currentColor" d="M2.7 1a.7.7 0 0 0-.7.7v12.6a.7.7 0 0 0 .7.7h2.6a.7.7 0 0 0 .7-.7V1.7a.7.7 0 0 0-.7-.7zm8 0a.7.7 0 0 0-.7.7v12.6a.7.7 0 0 0 .7.7h2.6a.7.7 0 0 0 .7-.7V1.7a.7.7 0 0 0-.7-.7z"/></svg>'
@@ -464,7 +502,7 @@ object SpotilolPlayer {
                         if(dcb) dcb.style.display = window.__splDlActive ? '' : 'none';
 
                         var pbEl=document.querySelector('[data-testid="playback-progressbar"] [data-testid="progress-bar"]');
-                        if(pbEl){
+                        if(pbEl&&__optHold!=='skip'){
                             var cs=getComputedStyle(pbEl);
                             var tr=cs.getPropertyValue('--progress-bar-transform');
                             if(tr){
