@@ -45,7 +45,8 @@ jobs:
           mkdir -p keystore
           echo "$KEYSTORE_BASE64" | base64 -d > keystore/release.p12
           printf 'storeFile=release.p12\nstorePassword=%s\nkeyAlias=%s\nkeyPassword=%s\n' \
-            "$STORE_PW" "$KEY_ALIAS" "$KEY_PW" > keystore/keystore.properties
+            "$STORE_PW" "$KEY_ALIAS" "$STORE_PW" > keystore/keystore.properties
+          # NOTE: PKCS#12 carries a single password; keyPassword must equal storePassword.
 
       - name: Build Release APK
         run: ./gradlew assembleRelease --no-daemon
