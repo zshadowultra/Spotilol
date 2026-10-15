@@ -138,6 +138,19 @@ object CustomUI {
                     return m ? m[1] : html;
                 }
 
+                // DEBUG: visible error banner
+                window.__splErrors = [];
+                window.addEventListener('error', function(e) {
+                    window.__splErrors.push(e.message);
+                    var b = document.getElementById('spl-err-banner');
+                    if (!b) {
+                        b = document.createElement('div');
+                        b.id = 'spl-err-banner';
+                        b.style.cssText = 'position:fixed;top:0;left:0;right:0;background:#c00;color:#fff;font-size:11px;padding:8px;z-index:999999999;white-space:pre-wrap;max-height:40%;overflow:auto;';
+                        document.body.appendChild(b);
+                    }
+                    b.textContent = 'ERR: ' + window.__splErrors.join('\n');
+                });
                 function loadAndInject() {
                     try {
                         // Idempotent: onPageFinished can fire multiple times (SPA
