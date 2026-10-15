@@ -140,6 +140,12 @@ object CustomUI {
 
                 function loadAndInject() {
                     try {
+                        // Idempotent: onPageFinished can fire multiple times (SPA
+                        // navigations, reloads) and each injection would append
+                        // another #spl-custom-ui-root. The visible copy would be
+                        // the latest one, but $("#nav") binds to the first —
+                        // leaving the user tapping a dead UI.
+                        if (document.getElementById('spl-custom-ui-root')) return;
                         var html = AndBridge.loadCustomUiAsset('index.html');
                         var css = AndBridge.loadCustomUiAsset('styles.css');
                         var tokens = AndBridge.loadCustomUiAsset('tokens.css');
