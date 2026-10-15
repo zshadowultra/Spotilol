@@ -40,7 +40,7 @@ object AndroidTracker {
                         clearTimeout(readTimeout);
                         readTimeout = setTimeout(readTrackState, 200);
                     });
-                    obs.observe(npTarget, { childList: true, subtree: true, attributes: true, characterData: true });
+                    obs.observe(npTarget, { childList: true, subtree: true, attributes: true, characterData: true, attributeFilter: ['aria-checked', 'aria-label', 'href', 'src', 'value', 'max'] });
                     aaint = obs;
                     readTrackState();
                 } catch(e) {

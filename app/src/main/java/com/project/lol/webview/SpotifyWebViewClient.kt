@@ -186,6 +186,13 @@ class SpotifyWebViewClient(
             add(CookieBypass.CONTENT)
         }
         return parts.joinToString("\n") { "try{\n$it\n}catch(e){}" }
+            .let { body ->
+                // Idempotency: document-start script + evaluateJavascript fallback can both
+                // fire on the same navigation (see onPageStarted). The tag changes when
+                // prefs change, so new values still apply; repeats on one page are no-ops.
+                val tag = body.hashCode().toString(16)
+                "if(window.__splEarly==='$tag'){}else{window.__splEarly='$tag';\n$body\n}"
+            }
     }
 
     private fun isWebPlayerUrl(url: String?): Boolean =
@@ -372,7 +379,12 @@ class SpotifyWebViewClient(
             append(MainLoop.CONTENT)
             append(AutoFeatures.CONTENT)
             append(AndroidTracker.CONTENT)
-            append(SearchOverlay.CONTENT)
+            // Old-UI cosmetic modules: skipped in customui mode (Spotify DOM is hidden
+            // there; Cadence provides its own search/player). CssHack stays: it defines
+            // closeNowPlay() used by the shared AutoFeatures/MainLoop modules.
+            if (playerMode != "customui") {
+                append(SearchOverlay.CONTENT)
+            }
             append(DownloadButton.CONTENT)
             append(DownloadProgress.CONTENT)
             append(CollectionDownload.CONTENT)
@@ -393,13 +405,15 @@ class SpotifyWebViewClient(
                 })();
             """.trimIndent())
             append(CssHack.CONTENT)
-            append(ModalFix.CONTENT)
-            append(ErrorDialogRestyle.CONTENT)
+            if (playerMode != "customui") {
+                append(ModalFix.CONTENT)
+                append(ErrorDialogRestyle.CONTENT)
+                append(LyricsSyncFix.CONTENT)
+                append(QueueAutoClose.CONTENT)
+                append(LibraryAutoClose.CONTENT)
+                append(PlaylistSort.CONTENT)
+            }
             append(ToastFix.CONTENT)
-            append(LyricsSyncFix.CONTENT)
-            append(QueueAutoClose.CONTENT)
-            append(LibraryAutoClose.CONTENT)
-            append(PlaylistSort.CONTENT)
             if (playerMode == "spotilol") {
                 append(SpotilolPlayer.CONTENT)
             }

@@ -29,8 +29,10 @@ object CssHack {
             };
             window.addCSSJSHack=function(){
                 if(cssint) clearInterval(cssint);
-                cssint=setInterval(function(){
+                window.__splCssQuiet=0;
+                var cssPass=function(){
                     if(window.__splBg) return;
+                    var before=document.querySelectorAll('.fuckd').length;
                     var lb=document.querySelector('#Desktop_LeftSidebar_Id header>div>div:first-child button:not(.fuckd)');
                     if(lb){
                         window.lBtn=lb;lb.classList.add('fuckd','lbtn');lb.style.padding=0;lb.style.height='20px';
@@ -63,7 +65,16 @@ object CssHack {
                             if(l&&window.closeNpPref) closeNowPlay();
                         },true);
                     }
-                },5000);
+                    // Back off when quiet: 4 consecutive no-op passes -> 30s warden
+                    if(document.querySelectorAll('.fuckd').length===before){
+                        if(++window.__splCssQuiet>=4&&cssint){
+                            clearInterval(cssint);
+                            cssint=setInterval(cssPass,30000);
+                            window.__splCssQuiet=0;
+                        }
+                    } else window.__splCssQuiet=0;
+                };
+                cssint=setInterval(cssPass,5000);
             };
             // Perf: replace :has() selectors with JS-added marker classes.
             // :has() forces reverse selector matching on every style recalc;

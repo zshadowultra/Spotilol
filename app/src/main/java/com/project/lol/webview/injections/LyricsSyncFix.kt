@@ -74,13 +74,22 @@ object LyricsSyncFix {
                 return best;
             }
 
-            function place(btn){
+            function splGeo(){
                 var vh = (typeof window.splViewH === 'function')
                     ? window.splViewH()
                     : (document.documentElement.clientHeight || window.innerHeight || 600);
                 var pt = (typeof window.splPlayerTop === 'function')
                     ? window.splPlayerTop()
                     : vh;
+                return { vh: vh, pt: pt };
+            }
+            function place(btn, geo){
+                var vh = geo ? geo.vh : (typeof window.splViewH === 'function'
+                    ? window.splViewH()
+                    : (document.documentElement.clientHeight || window.innerHeight || 600));
+                var pt = geo ? geo.pt : (typeof window.splPlayerTop === 'function'
+                    ? window.splPlayerTop()
+                    : vh);
                 var above = Math.max(10, vh - pt) + GAP;
                 var roof = vh - 56;
                 if (above > roof) above = roof;
@@ -112,7 +121,7 @@ object LyricsSyncFix {
                 btn.style.setProperty('margin', '0', 'important');
                 btn.style.setProperty('transform', 'translateX(-50%)', 'important');
                 btn.style.setProperty('visibility', 'visible', 'important');
-                place(btn);
+                place(btn, splGeo());
                 track(btn);
             }
 
@@ -149,8 +158,9 @@ object LyricsSyncFix {
             }
 
             function reposition(){
+                var geo = splGeo();
                 for (var i = 0; i < tracked.length; i++){
-                    if (tracked[i].isConnected) place(tracked[i]);
+                    if (tracked[i].isConnected) place(tracked[i], geo);
                 }
             }
 

@@ -40,6 +40,10 @@ object CustomUI {
                     function getTrack() {
                         try {
                             var title = '', artist = '', art = '', durationMs = 0;
+                            try {
+                                var av = document.querySelector('audio, video');
+                                if (av && av.duration && isFinite(av.duration)) durationMs = Math.floor(av.duration * 1000);
+                            } catch (e0) {}
                             var widget = document.querySelector('[data-testid="now-playing-widget"]');
                             if (widget) {
                                 var link = widget.querySelector('a[href*="/track/"]');
@@ -101,7 +105,7 @@ object CustomUI {
                             try { if (typeof window.actSkipBack === 'function') window.actSkipBack(); } catch (e) {}
                         },
                         seek: function(ms) {
-                            try { if (typeof window.actSeek === 'function') window.actSeek(ms / 1000); } catch (e) {}
+                            try { if (typeof window.actSeek === 'function') window.actSeek(Math.round(ms)); } catch (e) {}
                         },
                         like: function() {
                             try {
@@ -113,6 +117,17 @@ object CustomUI {
                                 }
                                 if (btn) btn.click();
                             } catch (e) {}
+                        },
+                        shuffle: function(want) {
+                            try {
+                                if (typeof window.actToggleShuffle !== 'function' || typeof window.splShuffleState !== 'function') return;
+                                var cur = window.splShuffleState();
+                                var isOn = cur === 'shuffle' || cur === 'smart';
+                                if (!!want !== isOn) window.actToggleShuffle();
+                            } catch (e) {}
+                        },
+                        repeat: function() {
+                            try { if (typeof window.actRepeat === 'function') window.actRepeat(); } catch (e) {}
                         },
                         on: function() { return function() {}; }
                     };
@@ -394,61 +409,7 @@ object CustomUI {
                         setTimeout(loadRealHomeContent, 3000);
                         setTimeout(loadRealHomeContent, 8000);
 
-                        // Live sync: poll real state and update UI
-                        var lastTitle = '', lastPlaying = null;
-                        var NOTHING_PLAYING = 'Nothing playing';
-                        setInterval(function() {
-                            try {
-                                var track = window.__bridge.track;
-                                var playing = window.__bridge.playing;
-
-                                // Update track info if changed (or if nothing is playing)
-                                var curTitle = (track.title || '').trim();
-                                if (curTitle && curTitle !== lastTitle) {
-                                    lastTitle = curTitle;
-                                    var titleEls = ['miniTitle', 'fpTitle'];
-                                    var artistEls = ['miniArtist', 'fpArtist'];
-                                    titleEls.forEach(function(id) {
-                                        var el = document.getElementById(id);
-                                        if (el) el.innerText = track.title;
-                                    });
-                                    artistEls.forEach(function(id) {
-                                        var el = document.getElementById(id);
-                                        if (el) el.innerText = track.artist || '';
-                                    });
-                                    // Update artwork if we have a real URL
-                                    if (track.art && track.art.indexOf('data:') !== 0) {
-                                        ['miniThumb', 'fpArtwork'].forEach(function(id) {
-                                            var el = document.getElementById(id);
-                                            if (el) el.src = track.art;
-                                        });
-                                    }
-                                } else if (!curTitle && lastTitle !== NOTHING_PLAYING) {
-                                    // Nothing playing - show placeholder instead of stale mock
-                                    lastTitle = NOTHING_PLAYING;
-                                    ['miniTitle', 'fpTitle'].forEach(function(id) {
-                                        var el = document.getElementById(id);
-                                        if (el) el.innerText = NOTHING_PLAYING;
-                                    });
-                                    ['miniArtist', 'fpArtist'].forEach(function(id) {
-                                        var el = document.getElementById(id);
-                                        if (el) el.innerText = 'Pick something to listen to';
-                                    });
-                                }
-
-                                // Update play/pause icons if changed
-                                if (playing !== lastPlaying) {
-                                    lastPlaying = playing;
-                                    var pauseSvg = '<path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/>';
-                                    var playSvg = '<path d="M8 5v14l11-7z"/>';
-                                    var icon = playing ? pauseSvg : playSvg;
-                                    ['miniPlayIcon', 'fpPlayIcon', 'headerPlayIcon'].forEach(function(id) {
-                                        var el = document.getElementById(id);
-                                        if (el) el.innerHTML = icon;
-                                    });
-                                }
-                            } catch (e) {}
-                        }, 1000);
+                        // Live sync is handled by the Cadence app.js payload (see custom-ui/app.js).
 
                         console.log('[CustomUI] Injected successfully');
                     } catch (e) {

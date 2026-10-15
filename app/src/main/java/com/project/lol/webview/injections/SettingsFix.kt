@@ -64,54 +64,61 @@ object SettingsFix {
                 }, true);
             }
 
-            function interceptAll() {
-                var links = document.querySelectorAll('a[target="_blank"]');
-                for (var i = 0; i < links.length; i++) {
-                    var a = links[i];
-                    if (a.__splIntercepted) continue;
-                    a.__splIntercepted = true;
+            function interceptLink(a) {
+                if (a.__splIntercepted) return;
+                a.__splIntercepted = true;
 
-                    a.addEventListener('click', function(e) {
-                        var href = this.href || '';
-                        if (!href || href.charAt(0) === '#') return;
-                        if (isAllowed(href)) return;
+                a.addEventListener('click', function(e) {
+                    var href = this.href || '';
+                    if (!href || href.charAt(0) === '#') return;
+                    if (isAllowed(href)) return;
 
-                        e.preventDefault();
-                        e.stopPropagation();
-                        try { AndBridge.dbg('s', 'Blocked external nav: ' + href); } catch(err) {}
-                        return false;
-                    }, true);
+                    e.preventDefault();
+                    e.stopPropagation();
+                    try { AndBridge.dbg('s', 'Blocked external nav: ' + href); } catch(err) {}
+                    return false;
+                }, true);
 
-                    a.addEventListener('auxclick', function(e) {
-                        var href = this.href || '';
-                        if (!href || isAllowed(href)) return;
-                        e.preventDefault();
-                        e.stopPropagation();
-                        return false;
-                    }, true);
+                a.addEventListener('auxclick', function(e) {
+                    var href = this.href || '';
+                    if (!href || isAllowed(href)) return;
+                    e.preventDefault();
+                    e.stopPropagation();
+                    return false;
+                }, true);
+            }
+
+            function interceptSubtree(root) {
+                if (!root || root.nodeType !== 1) return;
+                if (root.matches) {
+                    if (root.matches('a[target="_blank"]')) interceptLink(root);
+                    if (root.matches('ms-store-badge')) { hardBlock(root); root.style.pointerEvents = 'none'; }
+                    if (root.matches('img[src*="get.microsoft.com"]')) { hardBlock(root); root.style.pointerEvents = 'none'; root.style.display = 'none'; }
+                }
+                var links = root.querySelectorAll('a[target="_blank"]');
+                for (var i = 0; i < links.length; i++) interceptLink(links[i]);
+
+                var badges = root.querySelectorAll('ms-store-badge');
+                for (var j = 0; j < badges.length; j++) {
+                    hardBlock(badges[j]);
+                    badges[j].style.pointerEvents = 'none';
                 }
 
-                var badges = document.querySelectorAll('ms-store-badge');
-                for (var i = 0; i < badges.length; i++) {
-                    hardBlock(badges[i]);
-                    badges[i].style.pointerEvents = 'none';
-                }
-
-                var imgs = document.querySelectorAll('img[src*="get.microsoft.com"]');
-                for (var i = 0; i < imgs.length; i++) {
-                    hardBlock(imgs[i]);
-                    imgs[i].style.pointerEvents = 'none';
-                    imgs[i].style.display = 'none';
+                var imgs = root.querySelectorAll('img[src*="get.microsoft.com"]');
+                for (var k = 0; k < imgs.length; k++) {
+                    hardBlock(imgs[k]);
+                    imgs[k].style.pointerEvents = 'none';
+                    imgs[k].style.display = 'none';
                 }
             }
 
-            interceptAll();
+            interceptSubtree(document.documentElement);
 
             var obs = new MutationObserver(function(muts){
-                var dirty = false;
-                for (var i = 0; i < muts.length && !dirty; i++)
-                    if (muts[i].addedNodes.length) dirty = true;
-                if (dirty) interceptAll();
+                for (var i = 0; i < muts.length; i++) {
+                    var an = muts[i].addedNodes;
+                    for (var j = 0; j < an.length; j++) interceptSubtree(an[j]);
+                }
             });
             obs.observe(document.documentElement, {
                 childList: true, subtree: true

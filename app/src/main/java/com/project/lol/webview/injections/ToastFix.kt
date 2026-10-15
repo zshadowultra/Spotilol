@@ -123,10 +123,16 @@ object ToastFix {
                 return n;
             }
 
-            function place(el, idx){
+            function splGeo(){
                 var vh = (typeof window.splViewH === 'function') ? window.splViewH()
                         : (document.documentElement.clientHeight || window.innerHeight || 600);
                 var pt = (typeof window.splPlayerTop === 'function') ? window.splPlayerTop() : vh;
+                return { vh: vh, pt: pt };
+            }
+            function place(el, idx, geo){
+                var vh = geo ? geo.vh : (typeof window.splViewH === 'function' ? window.splViewH()
+                        : (document.documentElement.clientHeight || window.innerHeight || 600));
+                var pt = geo ? geo.pt : (typeof window.splPlayerTop === 'function' ? window.splPlayerTop() : vh);
                 var above = Math.max(10, vh - pt) + GAP + floatedSyncCount() * 52 + idx * STACK;
                 var roof = vh - 60;
                 if (above > roof) above = roof;
@@ -360,9 +366,10 @@ object ToastFix {
 
             function splRestack(){
                 var idx = 0;
+                var geo = splGeo();
                 for (var i = 0; i < tracked.length; i++){
                     var el = tracked[i];
-                    if (el.isConnected && !el.__splGhost) place(el, idx++);
+                    if (el.isConnected && !el.__splGhost) place(el, idx++, geo);
                 }
             }
 
