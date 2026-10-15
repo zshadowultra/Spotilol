@@ -115,6 +115,9 @@ public class Lame implements Closeable {
     private static native void nClose(long lamePtr);
 
     static {
-        System.loadLibrary("mp3lame-lib");
+        try {
+            System.loadLibrary("mp3lame-lib");
+        } catch (Throwable ignored) {
+        }
     }
 }

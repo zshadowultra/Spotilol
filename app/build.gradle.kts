@@ -16,7 +16,7 @@ val keystoreProperties = Properties().apply {
 
 android {
     namespace = "com.project.lol"
-    compileSdk = 37
+    compileSdk = 36
 
     defaultConfig {
         applicationId = "com.project.lol"
@@ -24,9 +24,6 @@ android {
         targetSdk = 36
         versionCode = 18
         versionName = "1.1.8"
-        ndk {
-            abiFilters += listOf("arm64-v8a", "armeabi-v7a")
-        }
     }
 
     buildFeatures {
@@ -35,6 +32,12 @@ android {
     }
 
     signingConfigs {
+        create("debugConfig") {
+            storeFile = file("${rootDir}/debug.keystore")
+            storePassword = "android"
+            keyAlias = "androiddebugkey"
+            keyPassword = "android"
+        }
         create("release") {
             storeFile = rootProject.file("keystore/${keystoreProperties.getProperty("storeFile")}")
             storePassword = keystoreProperties.getProperty("storePassword")
@@ -45,6 +48,7 @@ android {
 
     buildTypes {
         debug {
+            signingConfig = signingConfigs.getByName("debugConfig")
         }
         release {
             signingConfig = signingConfigs.getByName("release")

@@ -4,29 +4,12 @@ plugins {
 
 android {
     namespace = "com.project.lol.opus"
-    compileSdk = 37
+    compileSdk = 36
 
     defaultConfig {
         minSdk = 28
 
         consumerProguardFiles("consumer-rules.pro")
-
-        externalNativeBuild {
-            cmake {
-                cppFlags += listOf("-std=c++17", "-O3")
-                cFlags += listOf("-O3", "-funroll-loops")
-            }
-        }
-
-        ndk {
-            abiFilters += listOf("arm64-v8a", "armeabi-v7a")
-        }
-    }
-
-    externalNativeBuild {
-        cmake {
-            path = file("CMakeLists.txt")
-        }
     }
 
     compileOptions {

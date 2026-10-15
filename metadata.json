@@ -1,0 +1,8 @@
+{
+  "name": "Spotilol",
+  "description": "A music player and Spotify client with custom UI, offline downloads, and audio playback",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

@@ -49,6 +49,9 @@ public final class OpusDecoder implements Closeable {
     private static native String nativeVersion();
 
     static {
-        System.loadLibrary("opus-lib");
+        try {
+            System.loadLibrary("opus-lib");
+        } catch (Throwable ignored) {
+        }
     }
 }
