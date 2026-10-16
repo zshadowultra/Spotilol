@@ -419,6 +419,18 @@ class SpotifyWebViewClient(
             }
             if (playerMode == "customui") {
                 append(CustomUI.CONTENT)
+                // CSP bypass: app.js must run via evaluateJavascript (privileged),
+                // not via <script> element or eval() (both blocked by Spotify's CSP).
+                // Append it directly to the payload.
+                try {
+                    view.context.assets.open("custom-ui/app.js").use { input ->
+                        append("\n;(function(){\n")
+                        append(input.readBytes().toString(Charsets.UTF_8))
+                        append("\n})();\n")
+                    }
+                } catch (e: Exception) {
+                    Logger.e(TAG, "failed to append app.js", e)
+                }
             }
         }
         val cleanJs = JsUtils.stripConsoleLogs(js) + "\n" +

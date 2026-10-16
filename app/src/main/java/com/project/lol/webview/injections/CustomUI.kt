@@ -162,7 +162,6 @@ object CustomUI {
                         var html = AndBridge.loadCustomUiAsset('index.html');
                         var css = AndBridge.loadCustomUiAsset('styles.css');
                         var tokens = AndBridge.loadCustomUiAsset('tokens.css');
-                        var js = AndBridge.loadCustomUiAsset('app.js');
 
                         if (!html) {
                             console.error('[CustomUI] Failed to load index.html');
@@ -208,12 +207,8 @@ object CustomUI {
 
                         root.innerHTML = bodyHtml;
 
-                        // Inject JS - functions become global
-                        if (js) {
-                            var script = document.createElement('script');
-                            script.textContent = js;
-                            document.body.appendChild(script);
-                        }
+                        // app.js is appended directly to the evaluateJavascript payload
+                        // by SpotifyWebViewClient.kt (CSP blocks <script> and eval).
 
                         // Override prototype stubs with real bridge calls
                         // Must run after app.js defines the functions
