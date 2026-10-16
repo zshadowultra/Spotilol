@@ -22,8 +22,8 @@
 
   /* ---------------- bridge ---------------- */
 
-  const B = window.__bridge || {};
-  const hasBridge = !!window.__bridge;
+  let B = {};
+  let hasBridge = false;
 
   /* ---------------- demo data (fallback when no bridge) ---------------- */
 
@@ -727,9 +727,22 @@
     }, 500);
   }
 
-  if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", init);
-  } else {
+  // Boot on element-readiness, not document-readiness.
+  // CustomUI.CONTENT creates #spl-custom-ui-root ~200ms after this script
+  // runs (it waits for AndBridge). init() must wait for #view-home to exist.
+  function boot() {
+    if (window.__cadenceBooted) return;
+    window.__cadenceBooted = true;
+    B = window.__bridge || {};
+    hasBridge = !!window.__bridge;
     init();
   }
+  const tryBoot = () => {
+    if ($("#view-home")) {
+      clearInterval(bootIv);
+      boot();
+    }
+  };
+  let bootIv = setInterval(tryBoot, 100);
+  tryBoot();
 })();
